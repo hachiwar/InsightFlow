@@ -1,0 +1,10 @@
+# Local credentials and generated artifacts
+.env
+.idea/
+.vscode/
+__pycache__/
+*.py[cod]
+*.db
+*.log
+target/
+runtime_data/
