@@ -12,6 +12,7 @@ public class EchoMindProperties {
     private final Monitor monitor = new Monitor();
     private final Eval eval = new Eval();
     private final AskData askData = new AskData();
+    private final Security security = new Security();
 
     public Llm getLlm() {
         return llm;
@@ -39,6 +40,10 @@ public class EchoMindProperties {
 
     public AskData getAskData() {
         return askData;
+    }
+
+    public Security getSecurity() {
+        return security;
     }
 
     public static class Llm {
@@ -188,6 +193,7 @@ public class EchoMindProperties {
     public static class AskData {
         private String baseUrl = "http://localhost:8090";
         private long timeoutMs = 30000;
+        private String apiKey = "";
 
         public String getBaseUrl() {
             return baseUrl;
@@ -203,6 +209,35 @@ public class EchoMindProperties {
 
         public void setTimeoutMs(long timeoutMs) {
             this.timeoutMs = timeoutMs;
+        }
+
+        public String getApiKey() {
+            return apiKey;
+        }
+
+        public void setApiKey(String apiKey) {
+            this.apiKey = apiKey;
+        }
+    }
+
+    public static class Security {
+        private boolean enabled = false;
+        private String apiKey = "";
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getApiKey() {
+            return apiKey;
+        }
+
+        public void setApiKey(String apiKey) {
+            this.apiKey = apiKey;
         }
     }
 }

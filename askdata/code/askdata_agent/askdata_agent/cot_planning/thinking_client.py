@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 import urllib.request
 from dataclasses import dataclass
@@ -186,11 +187,12 @@ class ThinkingModelClient:
         """
         Mock 规划结果。
         """
+        match = re.search(r"# 用户Query\s*(.*?)\s*# Schema", prompt, re.S)
+        user_query = match.group(1).strip() if match else ""
         if (
-            "total_trade_count" in prompt
-            and "interest_rate" in prompt
-            and "trade_summary.user_id" in prompt
-            and "interest_info.user_id" in prompt
+            "50000" in user_query
+            and "交易笔数" in user_query
+            and "利率" in user_query
         ):
             return """步骤1：
 (
@@ -200,13 +202,7 @@ class ThinkingModelClient:
   输出目标: interest_info.interest_rate
 )"""
 
-        return """步骤1：
-(
-  数据库: 缺失,
-  处理对象: Schema中未找到足够的表、字段或表关联关系,
-  操作指令: 先检查用户Query涉及的筛选字段、输出字段和表关联关系；再发现当前Schema无法完整支撑该查询；最后返回缺失信息说明,
-  输出目标: 缺失，无法生成明确输出目标
-)"""
+        raise ValueError("Mock 模式只支持内置交易笔数与利率演示问题。")
 
     def _mock_generate_stream(self, prompt: str) -> Iterator[str]:
         """

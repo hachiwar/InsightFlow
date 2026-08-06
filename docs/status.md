@@ -22,38 +22,42 @@
 | DataAgent | 已接通 | 通过 HTTP 调用 AskData |
 | AskData 健康检查 | 已接通 | `GET /health` |
 | AskData 查询接口 | 已接通 | `POST /query` |
+| 公开 API 鉴权 | 已接通 | 容器部署强制使用 `X-API-Key` |
+| AskData 内部鉴权 | 已接通 | EchoMind 使用独立的 `X-Internal-API-Key` |
 | 字段级 Schema 检索 | 已实现 | AskData 核心代码 |
 | 关键词与向量混合召回 | 已实现 | 当前使用本地哈希向量作为可运行降级实现 |
 | RRF 融合 | 已实现 | AskData 检索链路 |
 | 远程 Rerank | 部分实现 | 需要有效服务配置；否则使用降级排序 |
 | SchemaGraph | 已实现 | AskData 检索结果构建 |
-| CoT 四元组规划 | 已实现 | 无模型密钥时使用 Mock |
-| SQL 生成 | 已实现 | 无模型密钥时使用 Mock |
-| SQLite 查询执行 | 已实现 | 当前演示数据源 |
+| CoT 四元组规划 | 已实现 | Mock 仅在显式启用时接受演示查询 |
+| SQL 生成 | 已实现 | 公开部署默认禁用 Mock |
+| SQLite 查询执行 | 已实现 | 只读连接、执行超时、最多返回 100 行 |
+| 单机容器部署 | 已实现 | 根级 Compose 启动 Caddy、EchoMind、AskData 和 Redis |
+| HTTPS | 已实现 | Caddy 在配置域名后自动管理证书 |
 | 标准远程 MCP Server | 待实现 | 当前 `MCPRouter` 是进程内路由抽象 |
 | 多生产数据库接入 | 待实现 | 文档有设计，当前 Demo 未实现 |
 | 结果一致性校验 | 待实现 | AskData Pipeline 尚未包含 |
 | 模块级错误回溯 | 待实现 | 仅存在于方案与面试文档 |
 | 数据查询结果自然语言总结 | 部分实现 | DataAgent 当前只格式化 SQL 和行结果 |
 | 数据查询专用评测集 | 待实现 | 需要意图、SQL 和答案三层指标 |
-| 生产级 SQL 安全治理 | 待实现 | 当前仅有 SQLite 演示执行器 |
+| 生产级 SQL 安全治理 | 部分实现 | 已限制只读、超时和行数；尚缺真实数据源的表字段白名单与审计 |
 
 ## 已验证内容
 
-- `askdata_pipeline.http_server` 通过 Python 语法检查；
-- AskData 端到端 Demo 在 UTF-8 输出环境中成功运行；
+- Python 安全回归测试通过；
+- Java 单元测试和 Maven 构建通过；
+- AskData 和 EchoMind Docker 镜像构建通过；
+- 根级 `compose.yaml` 解析通过；
 - `GET /health` 返回 `{"status":"ok"}`；
-- `POST /query` 可生成并执行演示查询；
-- 示例查询返回对应结果行。
-
-EchoMind 自带 `mvnw.cmd` 当前无法运行，原因是 `.mvn/wrapper/maven-wrapper.jar` 缺少主清单属性。Java 融合代码尚未完成最终编译确认。
+- 公开接口未授权返回 `401`，AskData 非法请求返回 `400`；
+- Caddy → EchoMind → AskData → SQLite 端到端查询通过，返回 `agent_type=data`；
+- Redis、AskData 和 EchoMind 未向主机公开端口。
 
 ## 后续顺序
 
-1. 修复或替换 Maven Wrapper，并完成 Java 编译。
-2. 为 DataAgent 增加最小单元测试和 HTTP 集成测试。
+1. 增加 DataAgent 与 AskData 的独立 HTTP 集成测试。
+2. 增加数据意图冲突用例和路由评测。
 3. 定义稳定的数据查询响应结构。
-4. 增加数据意图冲突用例和路由评测。
-5. 补充 SQL 白名单、超时和结果规模限制。
-6. 确认需要真实多数据库后，再实现标准 MCP Server 或数据库适配器。
-7. 最后实现结果校验和有限次数的模块级回溯。
+4. 接入真实数据库前，增加数据源、表和字段白名单以及 SQL 审计。
+5. 确认需要真实多数据库后，再实现标准 MCP Server 或数据库适配器。
+6. 最后实现结果校验和有限次数的模块级回溯。

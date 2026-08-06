@@ -38,8 +38,25 @@ EchoMind /chat
 InsightFlow/
 ├── askdata/             # Python Text2SQL 核心链路
 ├── echomind/            # Java 业务 Agent 与统一 API
-└── docs/                # 融合架构与实现状态
+├── deploy/              # Caddy 反向代理配置
+├── scripts/             # 部署冒烟测试
+├── docs/                # 融合架构、实现状态与上线指南
+└── compose.yaml         # 完整单机部署入口
 ```
+
+## Docker Compose 快速启动
+
+详细步骤和国内云服务器注意事项见[国内服务器上线指南](docs/InsightFlow国内服务器上线指南.md)。本地首次启动：
+
+```bash
+cp .env.example .env
+# 编辑 .env，替换 3 个密码并填写模型 API Key
+docker compose config --quiet
+docker compose up -d --build
+python3 scripts/smoke_test.py --base-url http://127.0.0.1 --api-key '<ECHOMIND_API_KEY>'
+```
+
+只有 Caddy 向主机映射 `80` 和 `443` 端口。Redis、AskData 和 EchoMind 仅通过 Compose 内部网络通信。
 
 ## 本地运行
 
@@ -49,6 +66,7 @@ InsightFlow/
 
 ```powershell
 $env:PYTHONIOENCODING = "utf-8"
+$env:ASKDATA_ALLOW_MOCK = "true" # 仅用于文档演示查询
 python -m askdata_pipeline.http_server
 ```
 
@@ -67,6 +85,9 @@ python -m askdata_pipeline.http_server
 |---|---:|---|
 | `ASKDATA_BASE_URL` | `http://localhost:8090` | AskData 服务地址 |
 | `ASKDATA_TIMEOUT_MS` | `30000` | 数据查询超时时间，单位为 ms |
+| `ASKDATA_API_KEY` | 空 | EchoMind 访问 AskData 的内部密钥 |
+| `ECHOMIND_AUTH_ENABLED` | `false` | 是否开启公开 API 鉴权 |
+| `ECHOMIND_API_KEY` | 空 | 公开 API 的 `X-API-Key` 密钥 |
 
 ### 调用统一入口
 
@@ -83,8 +104,11 @@ Content-Type: application/json
 ## 安全边界
 
 - AskData 当前只注册 SQLite 演示执行器。
+- SQLite 以只读模式执行，单次查询设置超时并最多返回 100 行。
+- 容器部署默认禁用 AskData Mock，未配置有效模型时数据查询失败关闭。
+- 公开 API 使用 `X-API-Key`，EchoMind 调用 AskData 使用独立的 `X-Internal-API-Key`。
 - 不允许模型直接持有数据库凭据或绕过执行服务连接数据库。
-- 接入生产数据库前，必须补充数据源白名单、表字段权限、查询超时、结果行数限制和 SQL 审计。
+- 接入生产数据库前，必须补充数据源白名单、表字段权限和 SQL 审计。
 - 当前代码尚未实现结果校验和模块级回溯，不应宣称已经形成完整 Reflection 闭环。
 
 ## 当前边界

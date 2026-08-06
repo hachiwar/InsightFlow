@@ -1,9 +1,9 @@
-target/
-.mvn/apache-maven-*/
-.mvn/*.zip
+.git/
 .idea/
-.vscode/
-.DS_Store
+.mvn/
+target/
+data/
 .env
 *.log
-data/
+docker-compose.yml
+config/

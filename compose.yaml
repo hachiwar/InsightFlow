@@ -1,0 +1,123 @@
+name: insightflow
+
+services:
+  redis:
+    image: redis:7.4.10-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+    command:
+      - sh
+      - -c
+      - exec redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+
+  askdata:
+    build:
+      context: ./askdata/code/askdata_agent/askdata_agent
+    restart: unless-stopped
+    init: true
+    read_only: true
+    environment:
+      ASKDATA_API_KEY: ${ASKDATA_API_KEY:?Set ASKDATA_API_KEY in .env}
+      ASKDATA_ALLOW_MOCK: ${ASKDATA_ALLOW_MOCK:-false}
+      ASKDATA_MAX_REQUEST_BYTES: ${ASKDATA_MAX_REQUEST_BYTES:-65536}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      DASHSCOPE_WORKSPACE_ID: ${DASHSCOPE_WORKSPACE_ID:-}
+    volumes:
+      - askdata-data:/app/runtime_data
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health', timeout=3).read()
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+
+  echomind:
+    build:
+      context: ./echomind/EchoMindJava/EchoMindJava
+    restart: unless-stopped
+    init: true
+    read_only: true
+    environment:
+      SERVER_PORT: 8080
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-deepseek}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-echomind-local-placeholder}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-echomind-local-placeholder}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-https://api.anthropic.com}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-3-5-sonnet-20241022}
+      LLM_FALLBACK_ENABLED: ${LLM_FALLBACK_ENABLED:-false}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+      ASKDATA_BASE_URL: http://askdata:8090
+      ASKDATA_TIMEOUT_MS: ${ASKDATA_TIMEOUT_MS:-30000}
+      ASKDATA_API_KEY: ${ASKDATA_API_KEY:?Set ASKDATA_API_KEY in .env}
+      ECHOMIND_AUTH_ENABLED: "true"
+      ECHOMIND_API_KEY: ${ECHOMIND_API_KEY:?Set ECHOMIND_API_KEY in .env}
+      ECHOMIND_DATA_DIR: /app/data/java
+      KNOWLEDGE_STORE_PATH: /app/data/java/knowledge-store.json
+      MEMORY_STORE_PATH: /app/data/java/memory-store.json
+      EVAL_BASELINE_PATH: /app/data/java/eval-baseline.json
+      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75.0}
+    volumes:
+      - echomind-data:/app/data
+    tmpfs:
+      - /tmp
+    depends_on:
+      redis:
+        condition: service_healthy
+      askdata:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+    security_opt:
+      - no-new-privileges:true
+
+  proxy:
+    image: caddy:2.11.4-alpine
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      echomind:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  redis-data:
+  askdata-data:
+  echomind-data:
+  caddy-data:
+  caddy-config:

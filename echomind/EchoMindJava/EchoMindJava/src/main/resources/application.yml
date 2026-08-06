@@ -72,6 +72,10 @@ echomind:
   ask-data:
     base-url: ${ASKDATA_BASE_URL:http://localhost:8090}
     timeout-ms: ${ASKDATA_TIMEOUT_MS:30000}
+    api-key: ${ASKDATA_API_KEY:}
+  security:
+    enabled: ${ECHOMIND_AUTH_ENABLED:false}
+    api-key: ${ECHOMIND_API_KEY:}
 
 ---
 spring:

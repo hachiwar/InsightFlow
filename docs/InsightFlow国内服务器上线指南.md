@@ -11,7 +11,7 @@ InsightFlow 由多个服务组成，不能只上传一个 JAR 文件完成部署
 ```text
 互联网用户
     ↓ HTTP/HTTPS
-Nginx 或 Caddy
+Caddy
     ↓
 EchoMind Java 服务
     ├── Redis：会话记忆
@@ -24,24 +24,21 @@ EchoMind Java 服务
 
 ### 1.1 当前仓库状态
 
-截至文档核对日期，仓库已经包含 EchoMind Dockerfile 和一份 EchoMind 局部 Compose 配置，但尚未形成可直接部署整个 InsightFlow 的根级 Compose 配置。
+截至文档核对日期，仓库已包含单机部署所需的容器、网络、持久化、反向代理和鉴权配置。
 
 | 项目 | 状态 | 说明 |
 |---|---|---|
-| EchoMind Dockerfile | 已有 | 位于 `echomind/EchoMindJava/EchoMindJava/Dockerfile` |
-| EchoMind Compose | 部分可用 | 尚未包含 AskData |
+| EchoMind Dockerfile | 已实现 | 位于 `echomind/EchoMindJava/EchoMindJava/Dockerfile` |
 | AskData HTTP 服务 | 已有 | 提供 `/health` 和 `/query` |
-| AskData Dockerfile | 待补充 | 目前不能作为独立容器构建 |
-| 根级 `compose.yaml` | 待补充 | 尚不能一条命令启动全部服务 |
-| 反向代理 | 部分可用 | 现有 Nginx 配置仅提供 HTTP |
-| HTTPS | 待补充 | 尚未配置证书申请与续期 |
-| API 鉴权 | 待补充 | 公开部署前必须限制敏感接口 |
-
-如果仓库根目录不存在 `compose.yaml` 和 `.env.example`，请停止执行第 7 节及后续命令。应先完成部署配置，不能直接使用现有 EchoMind Compose 代替整个项目部署。
+| AskData Dockerfile | 已实现 | 使用最小运行依赖和非 root 用户 |
+| 根级 `compose.yaml` | 已实现 | 统一启动 Redis、AskData、EchoMind 和 Caddy |
+| 反向代理 | 已实现 | 仅 Caddy 向主机映射端口 |
+| HTTPS | 已配置 | 使用域名时由 Caddy 自动申请和续期证书 |
+| API 鉴权 | 已实现 | 公开 API 和 AskData 内部 API 使用不同密钥 |
 
 ### 1.2 演示环境边界
 
-首次上线建议只使用仓库自带的 SQLite 演示数据。当前 AskData 在无有效模型密钥时会使用 Mock 规划和 SQL，不能将其作为通用数据问答能力，也不能接入真实业务数据库后直接向公网开放。
+首次上线建议只使用仓库自带的 SQLite 演示数据。容器配置默认禁用 Mock；仅在本地演示时才可以将 `ASKDATA_ALLOW_MOCK` 设为 `true`。Mock 只接受文档中的演示查询，其他查询会失败关闭。
 
 ## 2. 选择部署区域
 
@@ -181,20 +178,33 @@ cp .env.example .env
 nano .env
 ```
 
-推荐使用 DeepSeek 作为 EchoMind 的初始模型配置。示例中的尖括号内容必须替换，不能原样保留：
+先在服务器生成 3 个不同的随机密钥：
+
+```bash
+openssl rand -hex 32
+openssl rand -hex 32
+openssl rand -hex 32
+```
+
+将 3 行输出分别用于 `ECHOMIND_API_KEY`、`ASKDATA_API_KEY` 和 `REDIS_PASSWORD`。推荐使用 DeepSeek 作为 EchoMind 的初始模型配置：
 
 ```dotenv
+SITE_ADDRESS=:80
+HTTP_PORT=80
+HTTPS_PORT=443
+
+ECHOMIND_API_KEY=<第 1 个随机密钥>
+ASKDATA_API_KEY=<第 2 个随机密钥>
+REDIS_PASSWORD=<第 3 个随机密钥>
+
 SPRING_PROFILES_ACTIVE=deepseek
 DEEPSEEK_API_KEY=<填写 DeepSeek API Key>
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-chat
 
 DASHSCOPE_API_KEY=<填写 DashScope API Key>
-
-REDIS_PASSWORD=<生成一个至少 24 位的随机密码>
-ASKDATA_BASE_URL=http://askdata:8090
 ASKDATA_TIMEOUT_MS=30000
-
+ASKDATA_ALLOW_MOCK=false
 LLM_FALLBACK_ENABLED=false
 ```
 
@@ -300,11 +310,22 @@ docker compose exec askdata python -c "import urllib.request; print(urllib.reque
 ### 10.3 验证统一对话接口
 
 ```bash
+set -a
+. ./.env
+set +a
+
 curl --fail --show-error \
   --request POST \
   --header 'Content-Type: application/json; charset=utf-8' \
+  --header "X-API-Key: $ECHOMIND_API_KEY" \
   --data '{"message":"查询总交易笔数大于 50000 的用户利率","user_id":"demo-user","conversation_id":"demo-conversation"}' \
   http://127.0.0.1/chat
+```
+
+也可以使用仓库内的冒烟测试脚本：
+
+```bash
+python3 scripts/smoke_test.py --base-url http://127.0.0.1 --api-key "$ECHOMIND_API_KEY"
 ```
 
 验收时应检查：
@@ -315,8 +336,6 @@ curl --fail --show-error \
 - 响应包含 SQL 和查询结果；
 - 无关问题不会返回演示 SQL；
 - AskData 执行失败时，Java 不会把失败结果包装为成功。
-
-后两项在当前代码中尚未完全满足，公开部署前必须补齐。
 
 ## 11. 配置域名和 HTTPS
 
@@ -340,7 +359,20 @@ api.example.com
 
 ### 11.2 启用 HTTPS
 
-推荐在根级 Compose 中使用 Caddy 自动申请和续期证书；也可以使用 1Panel 创建反向代理网站并申请证书。
+将 `.env` 中的 `SITE_ADDRESS` 从 `:80` 改为自己的域名：
+
+```dotenv
+SITE_ADDRESS=api.example.com
+```
+
+然后重建 Caddy 容器：
+
+```bash
+docker compose up -d --force-recreate proxy
+docker compose logs --tail=100 proxy
+```
+
+Caddy 会自动申请和续期证书。也可以使用 1Panel 创建反向代理网站并申请证书。
 
 参考资料：
 
@@ -362,10 +394,10 @@ curl --fail --show-error https://api.example.com/health
 - [ ] 只开放 `22`、`80` 和 `443` 端口；
 - [ ] `.env` 权限为 `600`，且未提交 Git；
 - [ ] Redis、AskData 和 EchoMind 不直接暴露公网；
-- [ ] `/chat` 已增加 API Key、登录或其他访问控制；
-- [ ] `/knowledge/add`、`/knowledge/upload` 和 `/eval/run` 不允许匿名访问；
-- [ ] `/monitor`、`/metrics` 和 Swagger 文档已限制访问范围；
-- [ ] SQL 只允许白名单表字段，并限制超时和最大返回行数；
+- [ ] 调用 `/chat` 时已使用 `X-API-Key`；
+- [ ] `/knowledge/add`、`/knowledge/upload`、`/eval/run`、`/monitor` 和 `/metrics` 不允许匿名访问；
+- [ ] AskData 仅使用只读连接，并已限制超时和最大返回行数；
+- [ ] 接入真实数据库前，已增加数据源、表和字段白名单；
 - [ ] 没有模型密钥时，数据查询采用失败关闭而非 Mock 回答；
 - [ ] 当前数据库只包含演示数据；
 - [ ] 已设置云服务器和模型 API 的费用提醒；
@@ -551,13 +583,6 @@ docker compose up -d --force-recreate
 
 ## 20. 下一步
 
-在实际购买服务器前，应完成以下代码工作：
+当前代码已通过 Linux 容器构建和单机端到端冒烟测试，可以按照本文第 4～12 节执行首次演示上线。
 
-1. 添加 AskData Dockerfile 和最小运行依赖；
-2. 添加根级 `compose.yaml` 和 `.env.example`；
-3. 增加反向代理及 HTTPS 配置；
-4. 增加 API 鉴权和敏感接口限制；
-5. 修复 AskData Mock 的错误泛化问题；
-6. 完成 Linux Docker 构建和端到端冒烟测试。
-
-完成这些工作后，再按照本文第 4～12 节购买服务器并执行首次上线，可以减少付费后因构建或安全问题无法发布的风险。
+如果后续要接入真实业务数据，必须先完成数据源白名单、表字段权限、SQL 审计、正式备份和隐私审查。这些生产化工作不属于当前 SQLite 演示环境。

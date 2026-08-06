@@ -12,6 +12,7 @@ class PipelineConfig:
     database_name: str = "trade_db"
     db_path: str | Path = "runtime_data/trade_demo.db"
     sample_size: int = 5
+    allow_mock: bool = True
 
 
 @dataclass
@@ -38,7 +39,18 @@ class PipelineResult:
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典。"""
+        success = bool(self.step_logs) and all(
+            log.execution_result.get("success") is True
+            for log in self.step_logs
+        )
+        errors = [
+            str(log.execution_result.get("error"))
+            for log in self.step_logs
+            if log.execution_result.get("error")
+        ]
         return {
+            "success": success,
+            "error": "; ".join(errors) if errors else None,
             "query": self.query,
             "keywords": self.keywords,
             "schema_context": self.schema_context,

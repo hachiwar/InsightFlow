@@ -29,6 +29,7 @@ class MCPExecutionResult:
     columns: List[str] = field(default_factory=list)
     rows: List[Dict[str, Any]] = field(default_factory=list)
     row_count: int = 0
+    truncated: bool = False
     error: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -40,5 +41,6 @@ class MCPExecutionResult:
             "columns": self.columns,
             "rows": self.rows,
             "row_count": self.row_count,
+            "truncated": self.truncated,
             "error": self.error,
         }
