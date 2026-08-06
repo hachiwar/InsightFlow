@@ -30,7 +30,7 @@ EchoMind /chat
                     SQL 生成与只读执行
 ```
 
-详细设计见[架构设计](docs/architecture.md)，实现范围见[实现状态](docs/status.md)。
+详细设计见[架构设计](docs/architecture.md)，实现范围见[实现状态](docs/status.md)。首次部署前，请阅读[国内服务器上线指南](docs/InsightFlow国内服务器上线指南.md)。
 
 ## 目录结构
 
