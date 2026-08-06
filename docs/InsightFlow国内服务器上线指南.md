@@ -4,6 +4,66 @@
 
 文档核对日期：2026 年 8 月 6 日。
 
+## 0. 首次上线总清单
+
+当前部署代码位于 [GitHub Draft PR #1](https://github.com/hachiwar/InsightFlow/pull/1)，CI 已通过，但尚未合并到 `main`。在服务器上克隆 `main` 之前，必须先完成第 0.1 节。
+
+### 0.1 合并部署代码
+
+1. 打开 [Deploy InsightFlow with Docker Compose](https://github.com/hachiwar/InsightFlow/pull/1)。
+2. 确认页面中的 `verify` 检查为绿色通过状态。
+3. 单击 `Ready for review`，将 Draft PR 转为可审查状态。
+4. 单击 `Merge pull request`，将 PR 合并到 `main`。
+5. 打开仓库 `main` 分支，确认根目录已出现 `compose.yaml` 和 `.env.example`。
+
+如果暂时不想合并，可以仅用于临时测试的分支克隆命令：
+
+```bash
+git clone --branch agent/add-project-documentation --single-branch https://github.com/hachiwar/InsightFlow.git .
+```
+
+正式部署建议使用已合并的 `main`，不要长期从功能分支运行。
+
+### 0.2 准备上线资源
+
+| 资源 | 是否必须 | 用途 |
+|---|---|---|
+| 腾讯云或阿里云账号 | 必须 | 购买和管理 Linux 服务器 |
+| 4 核 8 GB Linux 服务器 | 推荐 | 构建并运行 Java、Python、Redis 和 Caddy |
+| DeepSeek 或 Anthropic API Key | 必须 | EchoMind 意图识别和对话 |
+| DashScope API Key | 正式数据问答必须 | AskData 查询规划和 SQL 生成 |
+| 3 个随机密钥 | 必须 | 公开 API、内部 AskData 和 Redis 鉴权 |
+| 域名 | 可选 | 通过 HTTPS 和固定地址访问 |
+| ICP 备案 | 中国大陆服务器域名接入时必须 | 中国大陆服务器上的公开网站接入 |
+
+第一次演示建议选择中国香港地域，先使用公网 IP 完成 HTTP 验证，再决定是否购买域名。
+
+### 0.3 执行上线流程
+
+| 顺序 | 操作 | 完成标准 | 对应章节 |
+|---:|---|---|---:|
+| 1 | 合并 Draft PR #1 | `main` 包含 `compose.yaml` | 0.1 |
+| 2 | 购买服务器 | 获得公网 IP 和 SSH 登录方式 | 2～4 |
+| 3 | 配置安全组 | 仅开放 `22`、`80` 和 `443` | 5 |
+| 4 | 检查 Docker 环境 | Docker、Compose 和 Git 均可用 | 6 |
+| 5 | 克隆代码 | 服务器上存在 `/opt/insightflow/compose.yaml` | 7 |
+| 6 | 填写 `.env` | 密钥已替换，文件权限为 `600` | 8 |
+| 7 | 构建并启动 | 4 个服务均为 `running` 或 `healthy` | 9 |
+| 8 | 运行冒烟测试 | `/health` 和 `/chat` 通过 | 10 |
+| 9 | 配置域名和 HTTPS | 证书有效，HTTPS 健康检查通过 | 11 |
+| 10 | 完成公开检查 | 第 12 节清单全部确认 | 12 |
+
+如果只需要首次技术验证，完成第 8 步即可。在此之前不需要购买域名。
+
+### 0.4 选择 AskData 运行模式
+
+| 模式 | `DASHSCOPE_API_KEY` | `ASKDATA_ALLOW_MOCK` | 适用场景 |
+|---|---|---|---|
+| 真实模型调用 | 填写有效密钥 | `false` | 公开演示，当前仍仅使用 SQLite 演示数据 |
+| 内置演示 | 可为空 | `true` | 仅验证文档中的交易笔数与利率问题 |
+
+内置演示模式不是通用 Text2SQL。公开分享服务前，必须配置真实 DashScope API Key，将 `ASKDATA_ALLOW_MOCK` 恢复为 `false`，并重建服务。
+
 ## 1. 阅读前说明
 
 InsightFlow 由多个服务组成，不能只上传一个 JAR 文件完成部署：
@@ -38,7 +98,7 @@ EchoMind Java 服务
 
 ### 1.2 演示环境边界
 
-首次上线建议只使用仓库自带的 SQLite 演示数据。容器配置默认禁用 Mock；仅在本地演示时才可以将 `ASKDATA_ALLOW_MOCK` 设为 `true`。Mock 只接受文档中的演示查询，其他查询会失败关闭。
+首次上线建议只使用仓库自带的 SQLite 演示数据。容器配置默认禁用 Mock；仅在受 API Key 保护的首次技术验证中，才可以临时将 `ASKDATA_ALLOW_MOCK` 设为 `true`。Mock 只接受文档中的演示查询，其他查询会失败关闭。
 
 ## 2. 选择部署区域
 
@@ -152,7 +212,7 @@ sudo chown "$USER":"$USER" /opt/insightflow
 cd /opt/insightflow
 ```
 
-克隆 `main` 分支：
+完成第 0.1 节的 PR 合并后，克隆 `main` 分支：
 
 ```bash
 git clone --branch main --single-branch https://github.com/hachiwar/InsightFlow.git .
@@ -163,7 +223,11 @@ git clone --branch main --single-branch https://github.com/hachiwar/InsightFlow.
 ```bash
 git status --short --branch
 git log -1 --oneline
+test -f compose.yaml
+test -f .env.example
 ```
+
+如果后两条命令任意一条失败，表示部署代码尚未进入当前分支，不要继续配置服务器。
 
 如果中国大陆服务器无法稳定访问 GitHub，可以将仓库同步到自己的 Gitee 仓库，再从 Gitee 克隆。不要从不明网盘下载源码压缩包。
 
@@ -200,13 +264,21 @@ REDIS_PASSWORD=<第 3 个随机密钥>
 SPRING_PROFILES_ACTIVE=deepseek
 DEEPSEEK_API_KEY=<填写 DeepSeek API Key>
 DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_MODEL=deepseek-chat
+DEEPSEEK_MODEL=deepseek-v4-flash
 
 DASHSCOPE_API_KEY=<填写 DashScope API Key>
 ASKDATA_TIMEOUT_MS=30000
 ASKDATA_ALLOW_MOCK=false
 LLM_FALLBACK_ENABLED=false
 ```
+
+如果尚未申请 DashScope API Key，进行首次技术验证时可以临时将 `ASKDATA_ALLOW_MOCK` 改为 `true`。此模式只支持本文的演示数据问题，不得将其宣传为真实数据问答能力。
+
+模型密钥申请和计费说明以官方页面为准：
+
+- [DeepSeek API 首次调用指南](https://api-docs.deepseek.com/zh-cn/guides/reasoning_model)；
+- [阿里云百炼：获取 API Key](https://help.aliyun.com/zh/model-studio/get-api-key)；
+- [Anthropic：当前 Claude 模型](https://platform.claude.com/docs/en/about-claude/models/overview)。
 
 保存后限制文件权限：
 
@@ -384,6 +456,8 @@ Caddy 会自动申请和续期证书。也可以使用 1Panel 创建反向代理
 ```bash
 curl --fail --show-error https://api.example.com/health
 ```
+
+除了在服务器上执行验证，还应在自己的电脑上执行同一命令，确认 DNS、云安全组和公网 HTTPS 链路均正常。
 
 浏览器地址栏应显示有效 HTTPS 证书，不应通过关闭证书校验绕过错误。
 
