@@ -87,6 +87,9 @@ public class IntentRecognizer {
             String json = sliceJsonObject(raw);
             Map<String, Object> data = objectMapper.readValue(json, new TypeReference<>() {
             });
+            if (!(data.get("intent") instanceof String) || !(data.get("confidence") instanceof Number)) {
+                throw new IllegalArgumentException("LLM intent response is incomplete");
+            }
             data.put("intent", parseIntent(String.valueOf(data.get("intent"))));
             return data;
         } catch (Exception ex) {
@@ -130,7 +133,7 @@ public class IntentRecognizer {
         IntentCategory best = IntentCategory.OTHER;
         double bestScore = 0.0;
         for (Map.Entry<IntentCategory, List<String>> entry : patterns.entrySet()) {
-            long hits = entry.getValue().stream().filter(msg::contains).count();
+            long hits = entry.getValue().stream().filter(pattern -> containsKeyword(msg, pattern)).count();
             if (hits > 0) {
                 double score = (double) hits / entry.getValue().size();
                 if (score > bestScore) {
@@ -236,5 +239,12 @@ public class IntentRecognizer {
 
     private String normalize(String value) {
         return value == null ? "" : value.toLowerCase(Locale.ROOT).trim();
+    }
+
+    private boolean containsKeyword(String text, String keyword) {
+        if (keyword.chars().allMatch(Character::isDigit)) {
+            return java.util.regex.Pattern.compile("\\b" + keyword + "\\b").matcher(text).find();
+        }
+        return text.contains(keyword);
     }
 }

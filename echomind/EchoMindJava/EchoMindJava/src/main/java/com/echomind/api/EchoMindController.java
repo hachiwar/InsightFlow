@@ -77,7 +77,7 @@ public class EchoMindController {
     @GetMapping("/health")
     @Operation(summary = "健康检查", description = "返回服务状态和 Agent 路由统计。")
     public Map<String, Object> health() {
-        return Map.of("status", "ok", "agents", orchestrator.stats());
+        return Map.of("status", "ok");
     }
 
     @PostMapping("/chat")

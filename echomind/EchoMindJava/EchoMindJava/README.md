@@ -92,7 +92,7 @@ Java 版通过 Spring profile 切换模型：
 SPRING_PROFILES_ACTIVE=deepseek
 DEEPSEEK_API_KEY=your_key
 DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_MODEL=deepseek-chat
+DEEPSEEK_MODEL=deepseek-v4-flash
 ```
 
 当前还做了启动容错：缺少真实 API Key 时使用 `echomind-local-placeholder` 避免 Spring AI 自动配置阶段直接失败。真实调用时如果没有配置真实 key，并且：
@@ -109,7 +109,7 @@ Anthropic 配置：
 SPRING_PROFILES_ACTIVE=anthropic
 ANTHROPIC_API_KEY=your_key
 ANTHROPIC_BASE_URL=https://api.anthropic.com
-ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
+ANTHROPIC_MODEL=claude-sonnet-5
 ```
 
 ### 记忆和知识库持久化

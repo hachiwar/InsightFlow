@@ -15,28 +15,37 @@ public class AskDataClient {
 
     private final URI queryUri;
     private final Duration timeout;
+    private final String apiKey;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
-    public AskDataClient(String baseUrl, Duration timeout, ObjectMapper objectMapper) {
+    public AskDataClient(String baseUrl, Duration timeout, String apiKey, ObjectMapper objectMapper) {
         this.queryUri = URI.create(baseUrl.replaceAll("/+$", "") + "/query");
         this.timeout = timeout;
+        this.apiKey = apiKey == null ? "" : apiKey;
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder().connectTimeout(timeout).build();
     }
 
     public String query(String question) throws Exception {
         String body = objectMapper.writeValueAsString(Map.of("query", question));
-        HttpRequest request = HttpRequest.newBuilder(queryUri)
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder(queryUri)
                 .timeout(timeout)
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body))
-                .build();
+                .header("Accept", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body));
+        if (!apiKey.isBlank()) {
+            requestBuilder.header("X-Internal-API-Key", apiKey);
+        }
+        HttpRequest request = requestBuilder.build();
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
             throw new IllegalStateException("AskData returned HTTP " + response.statusCode());
         }
         Map<String, Object> result = objectMapper.readValue(response.body(), new TypeReference<>() {});
+        if (!Boolean.TRUE.equals(result.get("success"))) {
+            throw new IllegalStateException("AskData query failed: " + result.get("error"));
+        }
         return format(result);
     }
 
@@ -49,7 +58,13 @@ public class AskDataClient {
                 answer.append("\nSQL: ").append(step.get("sql"));
                 Object execution = step.get("execution_result");
                 if (execution instanceof Map<?, ?> executionResult) {
+                    if (!Boolean.TRUE.equals(executionResult.get("success"))) {
+                        throw new IllegalStateException("AskData execution failed: " + executionResult.get("error"));
+                    }
                     answer.append("\n结果: ").append(executionResult.get("rows"));
+                    if (Boolean.TRUE.equals(executionResult.get("truncated"))) {
+                        answer.append("\n提示: 结果已达到最大行数限制，仅显示前部数据。");
+                    }
                 }
             }
         }

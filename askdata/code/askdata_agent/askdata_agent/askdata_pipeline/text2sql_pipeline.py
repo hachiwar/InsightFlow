@@ -78,12 +78,15 @@ class AskDataText2SQLPipeline:
             schema_store=schema_store,
             coder_client=CoderModelClient(
                 CoderModelConfig(
-                    use_mock_when_no_api_key=True,
+                    use_mock_when_no_api_key=self.config.allow_mock,
                 )
             ),
         )
 
         step_logs: List[StepExecutionLog] = []
+
+        if not cot_result.steps:
+            raise ValueError("查询规划未生成可执行步骤。")
 
         for cot_step in cot_result.steps:
             sql_cot_step = CotStep(
@@ -167,7 +170,7 @@ class AskDataText2SQLPipeline:
         return CotPlanner(
             thinking_client=ThinkingModelClient(
                 ThinkingModelConfig(
-                    use_mock_when_no_api_key=True,
+                    use_mock_when_no_api_key=self.config.allow_mock,
                     temperature=0.0,
                 )
             )

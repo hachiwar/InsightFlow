@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-runtime.txt
+        working-directory: askdata/code/askdata_agent/askdata_agent
+      - run: python -m unittest discover -s tests -v
+        working-directory: askdata/code/askdata_agent/askdata_agent
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - run: mvn --batch-mode test
+        working-directory: echomind/EchoMindJava/EchoMindJava
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: demo-site/package-lock.json
+      - run: npm ci
+        working-directory: demo-site
+      - run: npm test
+        working-directory: demo-site
+      - run: npm run build
+        working-directory: demo-site
+
+      - run: docker compose config --quiet
+        env:
+          REDIS_PASSWORD: ci-redis-password
+          ASKDATA_API_KEY: ci-internal-api-key
+          ECHOMIND_API_KEY: ci-public-api-key

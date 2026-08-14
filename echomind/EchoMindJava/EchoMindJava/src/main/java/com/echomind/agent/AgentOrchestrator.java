@@ -104,7 +104,9 @@ public class AgentOrchestrator {
 
     private boolean containsAny(String text, String... keywords) {
         for (String keyword : keywords) {
-            if (text.contains(keyword)) {
+            if (keyword.chars().allMatch(Character::isDigit)
+                    ? java.util.regex.Pattern.compile("\\b" + keyword + "\\b").matcher(text).find()
+                    : text.contains(keyword)) {
                 return true;
             }
         }

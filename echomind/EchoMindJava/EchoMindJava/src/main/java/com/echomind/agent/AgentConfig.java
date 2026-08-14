@@ -17,6 +17,7 @@ public class AgentConfig {
         var askData = new AskDataClient(
                 properties.getAskData().getBaseUrl(),
                 java.time.Duration.ofMillis(properties.getAskData().getTimeoutMs()),
+                properties.getAskData().getApiKey(),
                 objectMapper
         );
         return Map.of(
