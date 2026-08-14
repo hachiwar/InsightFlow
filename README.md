@@ -32,12 +32,32 @@ EchoMind /chat
 
 详细设计见[架构设计](docs/architecture.md)，实现范围见[实现状态](docs/status.md)。首次部署前，请阅读[国内服务器上线指南](docs/InsightFlow国内服务器上线指南.md)。
 
+## 在线范例站
+
+仓库包含可发布到 GitHub Pages 的纯前端范例站。它在浏览器内运行 SQLite 样例数据库，并逐步展示关键词识别、Schema 召回、查询规划、SQL 生成、只读检查、执行结果和结果解释。
+
+范例站提供以下两种模式：
+
+- 本地演示模式：不需要 API Key，支持 3 个经过测试的复杂多表场景；
+- 自定义模型模式：调用用户填写的 OpenAI 兼容 Chat Completions 端点，根据问题和召回的 Schema 动态生成 SQLite SQL。
+
+上线步骤见 [GitHub Pages 范例站上线指南](docs/InsightFlow-GitHub-Pages范例站上线指南.md)。在本地预览：
+
+```bash
+cd demo-site
+npm ci
+npm run dev
+```
+
+GitHub Pages 不能保管服务端密钥。范例站不会持久化 API Key，但浏览器仍会将 Key 直接发送到用户填写的模型端点。只应使用临时、限额 Key，不得输入生产长期密钥。
+
 ## 目录结构
 
 ```text
 InsightFlow/
 ├── askdata/             # Python Text2SQL 核心链路
 ├── echomind/            # Java 业务 Agent 与统一 API
+├── demo-site/           # GitHub Pages 浏览器 Text2SQL 范例站
 ├── deploy/              # Caddy 反向代理配置
 ├── scripts/             # 部署冒烟测试
 ├── docs/                # 融合架构、实现状态与上线指南
@@ -115,7 +135,7 @@ Content-Type: application/json
 
 该项目当前不包含：
 
-- 数据可视化前端；
+- 连接真实业务数据的数据可视化前端；
 - 数据库写入操作；
 - 标准远程 MCP Server；
 - 多生产数据库接入；

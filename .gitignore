@@ -8,3 +8,5 @@ __pycache__/
 *.log
 target/
 runtime_data/
+node_modules/
+dist/

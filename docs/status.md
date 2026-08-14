@@ -32,6 +32,9 @@
 | CoT 四元组规划 | 已实现 | Mock 仅在显式启用时接受演示查询 |
 | SQL 生成 | 已实现 | 公开部署默认禁用 Mock |
 | SQLite 查询执行 | 已实现 | 只读连接、执行超时、最多返回 100 行 |
+| GitHub Pages 范例站 | 已实现 | 浏览器内 SQLite、3 个复杂多表场景和完整执行轨迹 |
+| 自定义模型 Text2SQL | 已实现（演示） | 浏览器调用用户填写的 OpenAI 兼容端点；受端点 CORS 策略限制 |
+| 前端 SQL 只读检查 | 已实现 | 仅允许单条 `SELECT` / `WITH`，拒绝写入与结构变更关键字 |
 | 单机容器部署 | 已实现 | 根级 Compose 启动 Caddy、EchoMind、AskData 和 Redis |
 | HTTPS | 已实现 | Caddy 在配置域名后自动管理证书 |
 | 标准远程 MCP Server | 待实现 | 当前 `MCPRouter` 是进程内路由抽象 |
@@ -48,6 +51,8 @@
 - Java 单元测试和 Maven 构建通过；
 - AskData 和 EchoMind Docker 镜像构建通过；
 - 根级 `compose.yaml` 解析通过；
+- 范例站 3 个复杂查询场景和 SQL 只读拦截测试通过；
+- Vite 生产构建通过；
 - `GET /health` 返回 `{"status":"ok"}`；
 - 公开接口未授权返回 `401`，AskData 非法请求返回 `400`；
 - Caddy → EchoMind → AskData → SQLite 端到端查询通过，返回 `agent_type=data`；

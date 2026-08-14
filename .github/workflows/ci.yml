@@ -26,6 +26,18 @@ jobs:
       - run: mvn --batch-mode test
         working-directory: echomind/EchoMindJava/EchoMindJava
 
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: demo-site/package-lock.json
+      - run: npm ci
+        working-directory: demo-site
+      - run: npm test
+        working-directory: demo-site
+      - run: npm run build
+        working-directory: demo-site
+
       - run: docker compose config --quiet
         env:
           REDIS_PASSWORD: ci-redis-password
