@@ -441,6 +441,7 @@ export async function requestModelPlan({ endpoint, apiKey, model, question, tabl
 只根据给定 Schema 生成一条 SELECT/WITH SQL，不得使用写操作、PRAGMA、ATTACH 或不存在的字段。
 时间范围必须相对数据库 MAX(order_date) 推导，不能依赖服务器当前日期。
 返回严格 JSON，不要 Markdown：{"title":"短标题","plan":["步骤1","步骤2"],"sql":"SQL"}。`;
+  const deepSeekOptions = url.hostname === "api.deepseek.com" ? { thinking: { type: "disabled" } } : {};
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -450,6 +451,9 @@ export async function requestModelPlan({ endpoint, apiKey, model, question, tabl
     body: JSON.stringify({
       model: model.trim(),
       temperature: 0,
+      max_tokens: 1200,
+      response_format: { type: "json_object" },
+      ...deepSeekOptions,
       messages: [
         { role: "system", content: system },
         { role: "user", content: `业务问题：${question}\n\n可用 Schema：\n${schemaPrompt(tables)}` },
