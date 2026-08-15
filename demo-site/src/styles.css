@@ -70,7 +70,7 @@ h1 { font-size: 18px; }
 h2 { font-size: 15px; }
 .snapshot { color: var(--muted); font-size: 10px; white-space: nowrap; padding-top: 15px; }
 #question { width: 100%; min-height: 170px; resize: vertical; margin-top: 15px; border: 1px solid #cbd2dc; border-radius: 6px; padding: 13px; line-height: 1.75; color: var(--ink); background: white; outline: none; }
-#question:focus, input:focus, .sql-editor:focus { border-color: #84adff; box-shadow: 0 0 0 3px #eef4ff; }
+#question:focus, input:focus, select:focus, .sql-editor:focus { border-color: #84adff; box-shadow: 0 0 0 3px #eef4ff; }
 .character-count { margin-top: -25px; padding: 0 10px 10px; position: relative; text-align: right; color: #98a2b3; font-size: 10px; pointer-events: none; }
 .examples { margin-top: 20px; display: grid; gap: 8px; }
 .examples > span { font-size: 12px; font-weight: 700; }
@@ -86,9 +86,10 @@ h2 { font-size: 15px; }
 .model-settings[open] summary::after { content: "−"; }
 .model-settings summary small { margin-left: auto; margin-right: 8px; color: var(--muted); font-weight: 500; }
 .model-settings label:not(.toggle-row) { display: grid; gap: 6px; margin: 12px 0; font-size: 11px; font-weight: 650; }
-.model-settings input[type="url"], .model-settings input[type="password"], .model-settings input:not([type]) { width: 100%; border: 1px solid #cbd2dc; border-radius: 5px; height: 36px; padding: 0 10px; font-size: 11px; outline: none; }
+.model-settings input[type="url"], .model-settings input[type="password"], .model-settings input:not([type]), .model-settings select { width: 100%; border: 1px solid #cbd2dc; border-radius: 5px; height: 36px; padding: 0 10px; font-size: 11px; outline: none; background: white; }
 .toggle-row { display: flex; align-items: center; gap: 8px; color: #344054; font-size: 12px; }
 .toggle-row input { accent-color: var(--blue); }
+.compatibility-note { color: #344054; background: #f5f8ff; border: 1px solid #d1e0ff; border-radius: 6px; padding: 10px; font-size: 10px; line-height: 1.6; }
 .privacy-note { color: #7a2e0e; background: var(--amber-soft); border: 1px solid #fedf89; border-radius: 6px; padding: 10px; font-size: 10px; line-height: 1.6; }
 
 .stage-nav { min-height: 92px; display: grid; grid-template-columns: repeat(6, 1fr); align-items: center; padding: 17px 18px; border-bottom: 1px solid var(--line); overflow-x: auto; }

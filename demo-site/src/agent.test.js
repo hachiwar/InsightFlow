@@ -29,7 +29,7 @@ test("写操作和多语句在进入 SQLite 前被拦截", () => {
   assert.throws(() => assertReadonlySql("SELECT 1; SELECT 2"), /一条 SQL/);
 });
 
-test("DeepSeek 请求关闭思考模式并要求有限 JSON 输出", async () => {
+test("慢思考模型请求关闭思考模式并要求有限 JSON 输出", async () => {
   const originalFetch = globalThis.fetch;
   let requestBody;
   globalThis.fetch = async (_url, options) => {
@@ -42,16 +42,12 @@ test("DeepSeek 请求关闭思考模式并要求有限 JSON 输出", async () =>
     };
   };
   try {
-    await requestModelPlan({
-      endpoint: "https://api.deepseek.com/chat/completions",
-      apiKey: "temporary-test-key",
-      model: "deepseek-v4-flash",
-      question: "测试",
-      tables: [],
-    });
-    assert.deepEqual(requestBody.thinking, { type: "disabled" });
-    assert.deepEqual(requestBody.response_format, { type: "json_object" });
-    assert.equal(requestBody.max_tokens, 1200);
+    for (const endpoint of ["https://api.deepseek.com/chat/completions", "https://open.bigmodel.cn/api/paas/v4/chat/completions"]) {
+      await requestModelPlan({ endpoint, apiKey: "temporary-test-key", model: "test-model", question: "测试", tables: [] });
+      assert.deepEqual(requestBody.thinking, { type: "disabled" });
+      assert.deepEqual(requestBody.response_format, { type: "json_object" });
+      assert.equal(requestBody.max_tokens, 1200);
+    }
   } finally {
     globalThis.fetch = originalFetch;
   }

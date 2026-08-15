@@ -1,3 +1,10 @@
+export const MODEL_PROVIDERS = [
+  { id: "custom", name: "自定义 OpenAI 兼容接口", endpoint: "", model: "" },
+  { id: "deepseek", name: "DeepSeek", endpoint: "https://api.deepseek.com/chat/completions", model: "deepseek-v4-flash" },
+  { id: "qwen", name: "通义千问（阿里云百炼）", endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", model: "qwen-plus" },
+  { id: "glm", name: "智谱 GLM", endpoint: "https://open.bigmodel.cn/api/paas/v4/chat/completions", model: "glm-5.2" },
+];
+
 export const SCHEMA = [
   {
     name: "customers",
@@ -441,7 +448,7 @@ export async function requestModelPlan({ endpoint, apiKey, model, question, tabl
 只根据给定 Schema 生成一条 SELECT/WITH SQL，不得使用写操作、PRAGMA、ATTACH 或不存在的字段。
 时间范围必须相对数据库 MAX(order_date) 推导，不能依赖服务器当前日期。
 返回严格 JSON，不要 Markdown：{"title":"短标题","plan":["步骤1","步骤2"],"sql":"SQL"}。`;
-  const deepSeekOptions = url.hostname === "api.deepseek.com" ? { thinking: { type: "disabled" } } : {};
+  const fastModelOptions = ["api.deepseek.com", "open.bigmodel.cn"].includes(url.hostname) ? { thinking: { type: "disabled" } } : {};
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -453,7 +460,7 @@ export async function requestModelPlan({ endpoint, apiKey, model, question, tabl
       temperature: 0,
       max_tokens: 1200,
       response_format: { type: "json_object" },
-      ...deepSeekOptions,
+      ...fastModelOptions,
       messages: [
         { role: "system", content: system },
         { role: "user", content: `业务问题：${question}\n\n可用 Schema：\n${schemaPrompt(tables)}` },

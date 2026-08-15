@@ -3,6 +3,7 @@ import initSqlJs from "sql.js";
 import sqlWasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import {
   RELATIONS,
+  MODEL_PROVIDERS,
   SAMPLE_QUESTIONS,
   SCHEMA,
   SNAPSHOT_DATE,
@@ -103,6 +104,7 @@ export default function App() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
   const [modelEnabled, setModelEnabled] = useState(false);
+  const [providerId, setProviderId] = useState("custom");
   const [endpoint, setEndpoint] = useState("");
   const [model, setModel] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -199,6 +201,15 @@ export default function App() {
     }
   }
 
+  function chooseProvider(event) {
+    const provider = MODEL_PROVIDERS.find((item) => item.id === event.target.value);
+    setProviderId(provider.id);
+    if (!provider.endpoint) return;
+    setEndpoint(provider.endpoint);
+    setModel(provider.model);
+    setModelEnabled(true);
+  }
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -242,6 +253,11 @@ export default function App() {
               <input type="checkbox" checked={modelEnabled} onChange={(event) => setModelEnabled(event.target.checked)} />
               <span>使用模型动态生成 SQL</span>
             </label>
+            <label>模型服务商
+              <select value={providerId} onChange={chooseProvider}>
+                {MODEL_PROVIDERS.map((provider) => <option value={provider.id} key={provider.id}>{provider.name}</option>)}
+              </select>
+            </label>
             <label>Chat Completions API 地址
               <input type="url" autoComplete="off" value={endpoint} onChange={(event) => setEndpoint(event.target.value)} placeholder="https://example.com/v1/chat/completions" />
             </label>
@@ -251,6 +267,7 @@ export default function App() {
             <label>临时 API Key
               <input type="password" value={apiKey} autoComplete="off" onChange={(event) => setApiKey(event.target.value)} placeholder="刷新页面后自动清除" />
             </label>
+            <p className="compatibility-note"><strong>接入规范：</strong>服务需兼容 OpenAI Chat Completions、支持 JSON 输出，并允许来自本站的浏览器跨域请求（CORS）。预设值可以手动修改。</p>
             <p className="privacy-note"><strong>安全提示：</strong>Key 仅保存在当前页面内存，但浏览器会把它直接发给你填写的端点。请只使用临时、限额 Key；不要填写生产长期密钥。</p>
           </details>
         </aside>
