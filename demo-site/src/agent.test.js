@@ -10,6 +10,7 @@ import {
   getDemoDatabase,
   requestModelExplanation,
   requestModelPlan,
+  requestModelRepair,
 } from "./agent.js";
 
 const wasmPath = fileURLToPath(new URL("../node_modules/sql.js/dist/sql-wasm.wasm", import.meta.url));
@@ -79,6 +80,34 @@ test("模型解释接收已执行 SQL 和真实查询结果", async () => {
     assert.match(requestBody.messages[1].content, /-212000/);
     assert.match(requestBody.messages[0].content, /不得把当前值当作变化额/);
     assert.equal(requestBody.max_tokens, 700);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("SQL 纠错请求包含失败 SQL、SQLite 错误和 Schema", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestBody;
+  globalThis.fetch = async (_url, options) => {
+    requestBody = JSON.parse(options.body);
+    return {
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '{"title":"已修复","plan":["修正字段"],"sql":"SELECT revenue FROM orders"}' } }] }),
+    };
+  };
+  try {
+    const repaired = await requestModelRepair({
+      endpoint: "https://api.deepseek.com/chat/completions",
+      apiKey: "temporary-test-key",
+      model: "deepseek-v4-flash",
+      question: "查询收入",
+      tables: [{ name: "orders", label: "订单", columns: [["revenue", "NUMERIC", "收入"]] }],
+      sql: "SELECT product_cost FROM monthly",
+      error: "no such column: product_cost",
+    });
+    assert.equal(repaired.sql, "SELECT revenue FROM orders");
+    assert.match(requestBody.messages[1].content, /no such column: product_cost/);
+    assert.match(requestBody.messages[1].content, /TABLE orders/);
   } finally {
     globalThis.fetch = originalFetch;
   }
