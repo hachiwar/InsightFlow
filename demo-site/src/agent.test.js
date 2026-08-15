@@ -8,6 +8,7 @@ import {
   buildPipeline,
   executeReadonly,
   getDemoDatabase,
+  requestModelExplanation,
   requestModelPlan,
 } from "./agent.js";
 
@@ -48,6 +49,34 @@ test("慢思考模型请求关闭思考模式并要求有限 JSON 输出", async
       assert.deepEqual(requestBody.response_format, { type: "json_object" });
       assert.equal(requestBody.max_tokens, 1200);
     }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("模型解释接收已执行 SQL 和真实查询结果", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestBody;
+  globalThis.fetch = async (_url, options) => {
+    requestBody = JSON.parse(options.body);
+    return {
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '{"explanation":"华北利润为负，应检查成本结构。"}' } }] }),
+    };
+  };
+  try {
+    const explanation = await requestModelExplanation({
+      endpoint: "https://api.deepseek.com/chat/completions",
+      apiKey: "temporary-test-key",
+      model: "deepseek-v4-flash",
+      question: "哪些地区亏损？",
+      sql: "SELECT region, profit FROM summary",
+      result: { columns: ["region", "profit"], rows: [{ region: "华北", profit: -212000 }], rowCount: 1, truncated: false },
+    });
+    assert.equal(explanation, "华北利润为负，应检查成本结构。");
+    assert.match(requestBody.messages[1].content, /华北/);
+    assert.match(requestBody.messages[1].content, /-212000/);
+    assert.equal(requestBody.max_tokens, 700);
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -13,6 +13,7 @@ import {
   extractKeywords,
   formatNumber,
   getDemoDatabase,
+  requestModelExplanation,
   summarizeResult,
 } from "./agent.js";
 
@@ -99,7 +100,7 @@ export default function App() {
   const [pipeline, setPipeline] = useState(null);
   const [result, setResult] = useState(null);
   const [sql, setSql] = useState("");
-  const [explanation, setExplanation] = useState("");
+  const [explanation, setExplanation] = useState(null);
   const [activeStage, setActiveStage] = useState(0);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
@@ -113,6 +114,17 @@ export default function App() {
   const selectedNames = useMemo(() => new Set((pipeline?.tables ?? []).map((table) => table.name)), [pipeline]);
   const previewKeywords = pipeline?.keywords ?? extractKeywords(question);
 
+  async function explainResult(nextPipeline, nextSql, nextResult, targetQuestion, signal) {
+    const localText = summarizeResult(nextPipeline, nextResult);
+    if (!modelEnabled) return { text: localText, mode: "local" };
+    try {
+      const text = await requestModelExplanation({ endpoint, apiKey, model, question: targetQuestion, sql: nextSql, result: nextResult, signal });
+      return { text, mode: "model" };
+    } catch {
+      return { text: localText, mode: "fallback" };
+    }
+  }
+
   async function analyze(targetQuestion = question, targetDatabase = database) {
     if (!targetDatabase || running || !targetQuestion.trim()) return;
     abortRef.current?.abort();
@@ -125,7 +137,7 @@ export default function App() {
     }, 45_000);
     setRunning(true);
     setError("");
-    setExplanation("");
+    setExplanation(null);
     setResult(null);
     setActiveStage(1);
     try {
@@ -146,7 +158,7 @@ export default function App() {
       setActiveStage(5);
       const nextResult = executeReadonly(targetDatabase, nextPipeline.sql);
       setResult(nextResult);
-      setExplanation(summarizeResult(nextPipeline, nextResult));
+      setExplanation(await explainResult(nextPipeline, nextPipeline.sql, nextResult, targetQuestion.trim(), controller.signal));
       setActiveStage(6);
     } catch (caught) {
       if (timedOut) {
@@ -161,17 +173,26 @@ export default function App() {
     }
   }
 
-  function rerunSql() {
+  async function rerunSql() {
     if (!database || !pipeline) return;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const timeoutId = window.setTimeout(() => controller.abort(), 45_000);
+    setRunning(true);
     setError("");
+    setExplanation(null);
     try {
       setActiveStage(5);
       const nextResult = executeReadonly(database, sql);
       setResult(nextResult);
-      setExplanation(summarizeResult(pipeline, nextResult));
+      setExplanation(await explainResult(pipeline, sql, nextResult, question.trim(), controller.signal));
       setActiveStage(6);
     } catch (caught) {
       setError(caught.message);
+    } finally {
+      window.clearTimeout(timeoutId);
+      setRunning(false);
     }
   }
 
@@ -268,7 +289,7 @@ export default function App() {
               <input type="password" value={apiKey} autoComplete="off" onChange={(event) => setApiKey(event.target.value)} placeholder="刷新页面后自动清除" />
             </label>
             <p className="compatibility-note"><strong>接入规范：</strong>服务需兼容 OpenAI Chat Completions、支持 JSON 输出，并允许来自本站的浏览器跨域请求（CORS）。预设值可以手动修改。</p>
-            <p className="privacy-note"><strong>安全提示：</strong>Key 仅保存在当前页面内存，但浏览器会把它直接发给你填写的端点。请只使用临时、限额 Key；不要填写生产长期密钥。</p>
+            <p className="privacy-note"><strong>安全提示：</strong>Key 仅保存在当前页面内存；启用模型后，业务问题、相关 Schema、SQL 和查询结果会直接发送到所填端点。请只使用临时、限额 Key，不要提交敏感数据。</p>
           </details>
         </aside>
 
@@ -322,7 +343,7 @@ export default function App() {
           <section className="result-panel">
             <div className="block-title"><div><p className="section-kicker">步骤 5 · 真实执行</p><h2>执行结果</h2></div>{result ? <span className="row-count">{result.rowCount} 行</span> : null}</div>
             <ResultTable result={result} />
-            {explanation ? <div className="explanation"><span>步骤 6 · 结果解释</span><p>{explanation}</p></div> : null}
+            {explanation ? <div className="explanation"><span>步骤 6 · 结果解释 · {explanation.mode === "model" ? "模型生成" : explanation.mode === "fallback" ? "本地降级" : "本地总结"}</span><p>{explanation.text}</p></div> : null}
           </section>
         </aside>
       </main>
