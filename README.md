@@ -39,7 +39,7 @@ EchoMind /chat
 范例站提供以下两种模式：
 
 - 本地演示模式：不需要 API Key，支持 3 个经过测试的复杂多表场景；
-- 自定义模型模式：调用用户填写的 OpenAI 兼容 Chat Completions 端点，根据问题和召回的 Schema 动态生成 SQLite SQL。
+- 自定义模型模式：内置 DeepSeek、通义千问和智谱 GLM 预设，也可填写任意 OpenAI 兼容 Chat Completions 端点。模型先根据问题和 Schema 生成 SQLite SQL，再根据实际查询结果生成业务解释；解释请求失败时回退到本地总结。
 
 上线步骤见 [GitHub Pages 范例站上线指南](docs/InsightFlow-GitHub-Pages范例站上线指南.md)。在本地预览：
 
@@ -49,7 +49,7 @@ npm ci
 npm run dev
 ```
 
-GitHub Pages 不能保管服务端密钥。范例站不会持久化 API Key，但浏览器仍会将 Key 直接发送到用户填写的模型端点。只应使用临时、限额 Key，不得输入生产长期密钥。
+GitHub Pages 不能保管服务端密钥。范例站不会持久化 API Key，但浏览器会将 Key、业务问题、相关 Schema、SQL 和查询结果直接发送到用户填写的模型端点。只应使用临时、限额 Key，不得输入生产长期密钥或提交敏感数据。
 
 ## 目录结构
 

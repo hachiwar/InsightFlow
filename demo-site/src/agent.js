@@ -1,3 +1,10 @@
+export const MODEL_PROVIDERS = [
+  { id: "custom", name: "自定义 OpenAI 兼容接口", endpoint: "", model: "" },
+  { id: "deepseek", name: "DeepSeek", endpoint: "https://api.deepseek.com/chat/completions", model: "deepseek-v4-flash" },
+  { id: "qwen", name: "通义千问（阿里云百炼）", endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", model: "qwen-plus" },
+  { id: "glm", name: "智谱 GLM", endpoint: "https://open.bigmodel.cn/api/paas/v4/chat/completions", model: "glm-5.2" },
+];
+
 export const SCHEMA = [
   {
     name: "customers",
@@ -409,13 +416,17 @@ function schemaPrompt(tables) {
   }).join("\n\n");
 }
 
-function parseModelJson(raw) {
+function parseModelObject(raw) {
   const text = typeof raw === "string" ? raw : "";
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1] ?? text;
   const start = fenced.indexOf("{");
   const end = fenced.lastIndexOf("}");
   if (start < 0 || end <= start) throw new Error("模型没有返回可解析的 JSON。");
-  const parsed = JSON.parse(fenced.slice(start, end + 1));
+  return JSON.parse(fenced.slice(start, end + 1));
+}
+
+function parseModelPlan(raw) {
+  const parsed = parseModelObject(raw);
   if (!Array.isArray(parsed.plan) || !parsed.plan.length || typeof parsed.sql !== "string") {
     throw new Error("模型返回缺少 plan 或 sql 字段。");
   }
@@ -427,7 +438,7 @@ function parseModelJson(raw) {
   };
 }
 
-export async function requestModelPlan({ endpoint, apiKey, model, question, tables, signal }) {
+async function requestModelContent({ endpoint, apiKey, model, messages, maxTokens = 1200, signal }) {
   let url;
   try {
     url = new URL(endpoint);
@@ -437,11 +448,7 @@ export async function requestModelPlan({ endpoint, apiKey, model, question, tabl
   if (!/^https?:$/.test(url.protocol)) throw new Error("API 地址只支持 HTTP 或 HTTPS。");
   if (!apiKey.trim() || !model.trim()) throw new Error("模型模式需要填写模型名称和临时 API Key。");
 
-  const system = `你是 InsightFlow 的 Text2SQL 规划器。数据库是只读 SQLite，数据快照日期为 ${SNAPSHOT_DATE}。
-只根据给定 Schema 生成一条 SELECT/WITH SQL，不得使用写操作、PRAGMA、ATTACH 或不存在的字段。
-时间范围必须相对数据库 MAX(order_date) 推导，不能依赖服务器当前日期。
-返回严格 JSON，不要 Markdown：{"title":"短标题","plan":["步骤1","步骤2"],"sql":"SQL"}。`;
-  const deepSeekOptions = url.hostname === "api.deepseek.com" ? { thinking: { type: "disabled" } } : {};
+  const fastModelOptions = ["api.deepseek.com", "open.bigmodel.cn"].includes(url.hostname) ? { thinking: { type: "disabled" } } : {};
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -451,13 +458,10 @@ export async function requestModelPlan({ endpoint, apiKey, model, question, tabl
     body: JSON.stringify({
       model: model.trim(),
       temperature: 0,
-      max_tokens: 1200,
+      max_tokens: maxTokens,
       response_format: { type: "json_object" },
-      ...deepSeekOptions,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: `业务问题：${question}\n\n可用 Schema：\n${schemaPrompt(tables)}` },
-      ],
+      ...fastModelOptions,
+      messages,
     }),
     signal,
   });
@@ -466,8 +470,45 @@ export async function requestModelPlan({ endpoint, apiKey, model, question, tabl
     throw new Error(`模型接口返回 ${response.status}：${detail || "无错误详情"}`);
   }
   const payload = await response.json();
-  const content = payload?.choices?.[0]?.message?.content;
-  return parseModelJson(content);
+  return payload?.choices?.[0]?.message?.content;
+}
+
+export async function requestModelPlan({ endpoint, apiKey, model, question, tables, signal }) {
+  const system = `你是 InsightFlow 的 Text2SQL 规划器。数据库是只读 SQLite，数据快照日期为 ${SNAPSHOT_DATE}。
+只根据给定 Schema 生成一条 SELECT/WITH SQL，不得使用写操作、PRAGMA、ATTACH 或不存在的字段。
+时间范围必须相对数据库 MAX(order_date) 推导，不能依赖服务器当前日期。
+返回严格 JSON，不要 Markdown：{"title":"短标题","plan":["步骤1","步骤2"],"sql":"SQL"}。`;
+  const content = await requestModelContent({
+    endpoint,
+    apiKey,
+    model,
+    signal,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: `业务问题：${question}\n\n可用 Schema：\n${schemaPrompt(tables)}` },
+    ],
+  });
+  return parseModelPlan(content);
+}
+
+export async function requestModelExplanation({ endpoint, apiKey, model, question, sql, result, signal }) {
+  const system = `你是 InsightFlow 的业务数据分析师。只能依据提供的业务问题、已执行 SQL 和真实查询结果解释结论。
+使用简体中文，说明关键数值、业务含义和可验证的原因；没有数据时不得编造结论。
+返回严格 JSON，不要 Markdown：{"explanation":"2 至 4 句业务解释"}。`;
+  const content = await requestModelContent({
+    endpoint,
+    apiKey,
+    model,
+    maxTokens: 700,
+    signal,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: `业务问题：${question}\n\n已执行 SQL：\n${sql}\n\n真实查询结果：\n${JSON.stringify(result)}` },
+    ],
+  });
+  const explanation = parseModelObject(content).explanation;
+  if (typeof explanation !== "string" || !explanation.trim()) throw new Error("模型返回缺少 explanation 字段。");
+  return explanation.trim();
 }
 
 export async function buildPipeline({ question, modelConfig, signal }) {
