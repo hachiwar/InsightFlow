@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import initSqlJs from "sql.js";
 import {
   SAMPLE_QUESTIONS,
+  SCHEMA,
   assertReadonlySql,
   buildPipeline,
   executeReadonly,
@@ -45,11 +46,12 @@ test("慢思考模型请求关闭思考模式并要求有限 JSON 输出", async
   };
   try {
     for (const endpoint of ["https://api.deepseek.com/chat/completions", "https://open.bigmodel.cn/api/paas/v4/chat/completions"]) {
-      await requestModelPlan({ endpoint, apiKey: "temporary-test-key", model: "test-model", question: "测试", tables: [] });
+      await requestModelPlan({ endpoint, apiKey: "temporary-test-key", model: "test-model", question: "测试", tables: [SCHEMA.find((table) => table.name === "orders")] });
       assert.deepEqual(requestBody.thinking, { type: "disabled" });
       assert.deepEqual(requestBody.response_format, { type: "json_object" });
       assert.equal(requestBody.max_tokens, 1200);
       assert.match(requestBody.messages[0].content, /完整时间序列/);
+      assert.match(requestBody.messages[1].content, /completed（成功）/);
     }
   } finally {
     globalThis.fetch = originalFetch;
