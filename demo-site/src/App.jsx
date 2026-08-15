@@ -158,18 +158,20 @@ export default function App() {
       if (!modelEnabled) await sleep(120);
       setActiveStage(5);
       let nextResult;
-      try {
-        nextResult = executeReadonly(targetDatabase, nextPipeline.sql);
-      } catch (executionError) {
-        if (!modelEnabled) throw executionError;
-        setActiveStage(3);
-        const repaired = await requestModelRepair({ endpoint, apiKey, model, question: targetQuestion.trim(), tables: nextPipeline.tables, sql: nextPipeline.sql, error: executionError.message, signal: controller.signal });
-        nextPipeline = { ...nextPipeline, ...repaired, repaired: true };
-        setPipeline(nextPipeline);
-        setActiveStage(4);
-        setSql(nextPipeline.sql);
-        setActiveStage(5);
-        nextResult = executeReadonly(targetDatabase, nextPipeline.sql);
+      for (let repairCount = 0; repairCount <= 2; repairCount += 1) {
+        try {
+          nextResult = executeReadonly(targetDatabase, nextPipeline.sql);
+          break;
+        } catch (executionError) {
+          if (!modelEnabled || repairCount === 2) throw executionError;
+          setActiveStage(3);
+          const repaired = await requestModelRepair({ endpoint, apiKey, model, question: targetQuestion.trim(), tables: nextPipeline.tables, sql: nextPipeline.sql, error: executionError.message, signal: controller.signal });
+          nextPipeline = { ...nextPipeline, ...repaired, repaired: true };
+          setPipeline(nextPipeline);
+          setActiveStage(4);
+          setSql(nextPipeline.sql);
+          setActiveStage(5);
+        }
       }
       setResult(nextResult);
       setExplanation(await explainResult(nextPipeline, nextPipeline.sql, nextResult, targetQuestion.trim(), controller.signal));
@@ -302,7 +304,7 @@ export default function App() {
             <label>临时 API Key
               <input type="password" value={apiKey} autoComplete="off" onChange={(event) => setApiKey(event.target.value)} placeholder="刷新页面后自动清除" />
             </label>
-            <p className="compatibility-note"><strong>接入规范：</strong>服务需兼容 OpenAI Chat Completions、支持 JSON 输出，并允许来自本站的浏览器跨域请求（CORS）。预设值可以手动修改；SQL 执行错误会自动纠错一次。</p>
+            <p className="compatibility-note"><strong>接入规范：</strong>服务需兼容 OpenAI Chat Completions、支持 JSON 输出，并允许来自本站的浏览器跨域请求（CORS）。预设值可以手动修改；SQL 执行错误最多自动纠错 2 次。</p>
             <p className="privacy-note"><strong>安全提示：</strong>Key 仅保存在当前页面内存；启用模型后，业务问题、相关 Schema、SQL 和查询结果会直接发送到所填端点。请只使用临时、限额 Key，不要提交敏感数据。</p>
           </details>
         </aside>
