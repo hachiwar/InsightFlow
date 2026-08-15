@@ -14,6 +14,7 @@ import {
   formatNumber,
   getDemoDatabase,
   requestModelExplanation,
+  requestModelRepair,
   summarizeResult,
 } from "./agent.js";
 
@@ -134,7 +135,7 @@ export default function App() {
     const timeoutId = window.setTimeout(() => {
       timedOut = true;
       controller.abort();
-    }, 45_000);
+    }, 90_000);
     setRunning(true);
     setError("");
     setExplanation(null);
@@ -143,7 +144,7 @@ export default function App() {
     try {
       if (!modelEnabled) await sleep(120);
       setActiveStage(2);
-      const nextPipeline = await buildPipeline({
+      let nextPipeline = await buildPipeline({
         question: targetQuestion.trim(),
         modelConfig: modelEnabled ? { enabled: true, endpoint, model, apiKey } : null,
         signal: controller.signal,
@@ -156,13 +157,26 @@ export default function App() {
       assertReadonlySql(nextPipeline.sql);
       if (!modelEnabled) await sleep(120);
       setActiveStage(5);
-      const nextResult = executeReadonly(targetDatabase, nextPipeline.sql);
+      let nextResult;
+      try {
+        nextResult = executeReadonly(targetDatabase, nextPipeline.sql);
+      } catch (executionError) {
+        if (!modelEnabled) throw executionError;
+        setActiveStage(3);
+        const repaired = await requestModelRepair({ endpoint, apiKey, model, question: targetQuestion.trim(), tables: nextPipeline.tables, sql: nextPipeline.sql, error: executionError.message, signal: controller.signal });
+        nextPipeline = { ...nextPipeline, ...repaired, repaired: true };
+        setPipeline(nextPipeline);
+        setActiveStage(4);
+        setSql(nextPipeline.sql);
+        setActiveStage(5);
+        nextResult = executeReadonly(targetDatabase, nextPipeline.sql);
+      }
       setResult(nextResult);
       setExplanation(await explainResult(nextPipeline, nextPipeline.sql, nextResult, targetQuestion.trim(), controller.signal));
       setActiveStage(6);
     } catch (caught) {
       if (timedOut) {
-        setError("模型请求超过 45 秒，已停止等待。请检查端点状态后重试。");
+        setError("模型请求超过 90 秒，已停止等待。请检查端点状态后重试。");
       } else if (caught.name !== "AbortError") {
         const corsHint = caught instanceof TypeError ? "浏览器无法访问该端点，可能是网络或 CORS 限制。请使用允许浏览器跨域的兼容端点。" : caught.message;
         setError(corsHint);
@@ -288,7 +302,7 @@ export default function App() {
             <label>临时 API Key
               <input type="password" value={apiKey} autoComplete="off" onChange={(event) => setApiKey(event.target.value)} placeholder="刷新页面后自动清除" />
             </label>
-            <p className="compatibility-note"><strong>接入规范：</strong>服务需兼容 OpenAI Chat Completions、支持 JSON 输出，并允许来自本站的浏览器跨域请求（CORS）。预设值可以手动修改。</p>
+            <p className="compatibility-note"><strong>接入规范：</strong>服务需兼容 OpenAI Chat Completions、支持 JSON 输出，并允许来自本站的浏览器跨域请求（CORS）。预设值可以手动修改；SQL 执行错误会自动纠错一次。</p>
             <p className="privacy-note"><strong>安全提示：</strong>Key 仅保存在当前页面内存；启用模型后，业务问题、相关 Schema、SQL 和查询结果会直接发送到所填端点。请只使用临时、限额 Key，不要提交敏感数据。</p>
           </details>
         </aside>
@@ -320,7 +334,7 @@ export default function App() {
           <section className="trace-block plan-block">
             <div className="block-title">
               <div><p className="section-kicker">步骤 3 · 查询规划</p><h2>{pipeline?.title ?? "等待生成计划"}</h2></div>
-              {pipeline ? <span className={`mode-pill ${pipeline.mode}`}>{pipeline.mode === "model" ? "模型动态生成" : "已验证范例"}</span> : null}
+              {pipeline ? <span className={`mode-pill ${pipeline.mode}`}>{pipeline.repaired ? "模型自动纠错" : pipeline.mode === "model" ? "模型动态生成" : "已验证范例"}</span> : null}
             </div>
             {pipeline ? <ol>{pipeline.plan.map((step) => <li key={step}>{step}</li>)}</ol> : <div className="placeholder-lines" aria-hidden="true"><i /><i /><i /></div>}
           </section>

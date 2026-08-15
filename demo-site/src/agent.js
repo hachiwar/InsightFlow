@@ -492,6 +492,24 @@ export async function requestModelPlan({ endpoint, apiKey, model, question, tabl
   return parseModelPlan(content);
 }
 
+export async function requestModelRepair({ endpoint, apiKey, model, question, tables, sql, error, signal }) {
+  const system = `你是 InsightFlow 的 Text2SQL 纠错器。SQLite 已拒绝执行上一条 SQL，请根据错误和 Schema 修复整条查询。
+检查每个 CTE 实际输出的字段、别名作用域、聚合与窗口函数顺序；时间范围必须相对数据库 MAX(order_date) 推导。
+涉及环比、同比或其他窗口比较时，必须先在完整时间序列中计算 LAG/LEAD，再筛选目标结果。
+只允许一条 SELECT/WITH SQL。返回严格 JSON，不要 Markdown：{"title":"短标题","plan":["修复步骤1","修复步骤2"],"sql":"修复后的 SQL"}。`;
+  const content = await requestModelContent({
+    endpoint,
+    apiKey,
+    model,
+    signal,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: `业务问题：${question}\n\n可用 Schema：\n${schemaPrompt(tables)}\n\n执行失败的 SQL：\n${sql}\n\nSQLite 错误：${error}` },
+    ],
+  });
+  return parseModelPlan(content);
+}
+
 export async function requestModelExplanation({ endpoint, apiKey, model, question, sql, result, signal }) {
   const system = `你是 InsightFlow 的业务数据分析师。只能依据提供的业务问题、已执行 SQL 和真实查询结果解释结论。
 使用简体中文，说明关键数值、业务含义和可验证的原因；没有数据时不得编造结论。
