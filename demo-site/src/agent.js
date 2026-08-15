@@ -40,7 +40,7 @@ export const SCHEMA = [
       ["order_date", "DATE", "订单日期"],
       ["channel", "TEXT", "销售渠道"],
       ["revenue", "NUMERIC", "确认收入"],
-      ["status", "TEXT", "订单状态"],
+      ["status", "TEXT", "订单状态：completed（成功）、cancelled（取消）"],
     ],
   },
   {
