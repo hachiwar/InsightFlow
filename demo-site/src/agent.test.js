@@ -48,6 +48,7 @@ test("慢思考模型请求关闭思考模式并要求有限 JSON 输出", async
       assert.deepEqual(requestBody.thinking, { type: "disabled" });
       assert.deepEqual(requestBody.response_format, { type: "json_object" });
       assert.equal(requestBody.max_tokens, 1200);
+      assert.match(requestBody.messages[0].content, /完整时间序列/);
     }
   } finally {
     globalThis.fetch = originalFetch;
@@ -76,6 +77,7 @@ test("模型解释接收已执行 SQL 和真实查询结果", async () => {
     assert.equal(explanation, "华北利润为负，应检查成本结构。");
     assert.match(requestBody.messages[1].content, /华北/);
     assert.match(requestBody.messages[1].content, /-212000/);
+    assert.match(requestBody.messages[0].content, /不得把当前值当作变化额/);
     assert.equal(requestBody.max_tokens, 700);
   } finally {
     globalThis.fetch = originalFetch;

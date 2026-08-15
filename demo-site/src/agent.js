@@ -477,6 +477,7 @@ export async function requestModelPlan({ endpoint, apiKey, model, question, tabl
   const system = `你是 InsightFlow 的 Text2SQL 规划器。数据库是只读 SQLite，数据快照日期为 ${SNAPSHOT_DATE}。
 只根据给定 Schema 生成一条 SELECT/WITH SQL，不得使用写操作、PRAGMA、ATTACH 或不存在的字段。
 时间范围必须相对数据库 MAX(order_date) 推导，不能依赖服务器当前日期。
+涉及环比、同比或其他窗口比较时，必须先在完整时间序列中计算 LAG/LEAD，再筛选目标结果；不得对筛选后的子集计算窗口差值。
 返回严格 JSON，不要 Markdown：{"title":"短标题","plan":["步骤1","步骤2"],"sql":"SQL"}。`;
   const content = await requestModelContent({
     endpoint,
@@ -494,6 +495,7 @@ export async function requestModelPlan({ endpoint, apiKey, model, question, tabl
 export async function requestModelExplanation({ endpoint, apiKey, model, question, sql, result, signal }) {
   const system = `你是 InsightFlow 的业务数据分析师。只能依据提供的业务问题、已执行 SQL 和真实查询结果解释结论。
 使用简体中文，说明关键数值、业务含义和可验证的原因；没有数据时不得编造结论。
+不得把当前值当作变化额。前值或变化字段为 null 时，必须明确说明无法归因，不得推测成本变化。
 返回严格 JSON，不要 Markdown：{"explanation":"2 至 4 句业务解释"}。`;
   const content = await requestModelContent({
     endpoint,
