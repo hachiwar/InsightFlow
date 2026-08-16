@@ -31,6 +31,7 @@ class MCPExecutionResult:
     row_count: int = 0
     truncated: bool = False
     error: Optional[str] = None
+    audit: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为可序列化字典。"""
@@ -43,4 +44,5 @@ class MCPExecutionResult:
             "row_count": self.row_count,
             "truncated": self.truncated,
             "error": self.error,
+            "audit": self.audit,
         }

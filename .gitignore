@@ -6,6 +6,13 @@ __pycache__/
 *.py[cod]
 *.db
 *.log
+*.pdf
+
+# Local interview and resume preparation materials
+/dataagent/面试话术.md
+/dataagent/项目.md
+/dataagent/项目内容.md
+/mindagent/MindAgent 场景扩展.md
 target/
 runtime_data/
 node_modules/

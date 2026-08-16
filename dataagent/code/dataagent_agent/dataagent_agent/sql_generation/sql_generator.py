@@ -55,3 +55,30 @@ class SqlGenerator:
             raw_output=raw_output,
             sql=sql,
         )
+
+    def repair(
+        self,
+        cot_step: CotStep,
+        failed_sql: str,
+        execution_error: str,
+        sql_dialect: str = "标准SQL",
+    ) -> SqlGenerationResult:
+        local_schema = self.schema_store.extract_local_schema(cot_step)
+        request = SqlGenerationRequest(cot_step, local_schema, sql_dialect)
+        prompt = self.prompt_builder.build(request) + f"""
+
+# 执行反馈
+上一条 SQL：
+{failed_sql}
+
+数据库错误：{execution_error}
+
+请根据错误修复整条查询，仍然只输出一条只读 SQL。
+"""
+        raw_output = self.coder_client.generate_sql(prompt)
+        return SqlGenerationResult(
+            database=cot_step.database,
+            prompt=prompt,
+            raw_output=raw_output,
+            sql=self.coder_client.clean_sql(raw_output),
+        )
