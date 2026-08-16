@@ -19,8 +19,176 @@ import {
 } from "./agent.js";
 
 const STAGES = ["关键词识别", "Schema 召回", "查询规划", "SQL 生成", "只读执行", "结果解释"];
+const ROUTE_SCENARIOS = [
+  {
+    id: "general",
+    label: "知识问答",
+    question: "公司的退款政策和到账时间是什么？",
+    intent: "GENERAL",
+    agent: "GeneralAgent",
+    summary: "检索企业知识库，结合会话上下文生成有依据的客服回答。",
+    steps: ["读取工作记忆与历史摘要", "改写问题并检索知识库", "生成回答并校验依据", "写回会话与用户画像"],
+  },
+  {
+    id: "technical",
+    label: "技术支持",
+    question: "支付回调连续超时，应该先检查什么？",
+    intent: "TECHNICAL",
+    agent: "TechnicalAgent",
+    summary: "识别技术故障和紧急程度，路由到技术 Agent，并保留升级人工条件。",
+    steps: ["读取上下文与知识片段", "识别技术意图和紧急度", "生成分步排查建议", "校验回答并判断是否升级"],
+  },
+  {
+    id: "billing",
+    label: "账单账户",
+    question: "为什么本月账单比上月多了 380 元？",
+    intent: "BILLING",
+    agent: "BillingAgent",
+    summary: "处理账单、账户和退款类业务问题；服务失败时由编排器降级。",
+    steps: ["合并会话与知识上下文", "识别账单意图", "路由账单 Agent", "失败时回退 GeneralAgent"],
+  },
+  {
+    id: "data",
+    label: "数据分析",
+    question: "近 6 个月收入增长但利润下降的月份，主要成本原因是什么？",
+    intent: "DATA_QUERY",
+    agent: "DataAgent → AskData",
+    summary: "跨服务完成 Schema 检索、规划、SQL 生成、只读执行和结果解释。",
+    steps: ["DataAgent 调用 AskData /query", "关键词与向量混合召回", "SchemaGraph 与 CoT 四元组规划", "SQL 生成、只读执行与轨迹返回"],
+  },
+];
+
+const CAPABILITY_GROUPS = [
+  {
+    title: "EchoMind · 统一对话层",
+    description: "Java Spring Boot",
+    items: ["/chat 统一 API 与鉴权", "会话记忆、摘要与用户画像", "意图识别与四类 Agent 路由", "知识库 RAG、回答校验与人工升级", "熔断、降级、监控和评测"],
+  },
+  {
+    title: "AskData · 数据推理层",
+    description: "Python Text2SQL",
+    items: ["关键词、向量、RRF 与可降级 Rerank", "字段级 Schema 检索与 SchemaGraph", "CoT 四元组查询规划", "局部 Schema 驱动 SQL 生成", "MCPRouter 只读执行与轨迹"],
+  },
+  {
+    title: "部署 · 运行边界",
+    description: "Docker Compose",
+    items: ["Caddy 反向代理与 HTTPS", "公开 API 与内部服务独立密钥", "EchoMind、AskData、Redis 内网隔离", "只读容器与持久化数据卷", "健康检查与部署冒烟测试"],
+  },
+];
+
 const sleep = (duration) => new Promise((resolve) => setTimeout(resolve, duration));
 let didAutoRun = false;
+
+function ProjectShowcase() {
+  const [scenarioId, setScenarioId] = useState("data");
+  const scenario = ROUTE_SCENARIOS.find((item) => item.id === scenarioId);
+
+  return (
+    <section className="project-showcase" id="overview" aria-labelledby="showcase-title">
+      <div className="showcase-hero">
+        <div>
+          <p className="section-kicker">EchoMind × AskData</p>
+          <h1 id="showcase-title">一个入口，连接企业知识、业务 Agent 与数据分析</h1>
+          <p>InsightFlow 用 EchoMind 负责会话、意图和 Agent 编排，用 AskData 负责结构化数据推理。下面先展示完整系统如何路由，再进入可真实执行的浏览器数据实验室。</p>
+          <div className="hero-actions">
+            <a className="primary-link" href="#data-lab">运行数据链路</a>
+            <a className="secondary-link" href="#architecture">查看完整架构</a>
+          </div>
+        </div>
+        <div className="scope-card" aria-label="本站运行范围">
+          <strong>本站运行范围</strong>
+          <dl>
+            <div><dt>真实运行</dt><dd>SQLite、SQL 安全检查、查询结果</dd></div>
+            <div><dt>可选运行</dt><dd>用户自带模型的 SQL 与结果解释</dd></div>
+            <div><dt>架构展示</dt><dd>EchoMind、AskData、Redis、Caddy</dd></div>
+          </dl>
+          <p>GitHub Pages 是静态托管，不会在本站启动 Java/Python 后端。</p>
+        </div>
+      </div>
+
+      <div className="router-demo" aria-labelledby="router-title">
+        <div className="section-heading">
+          <div><p className="section-kicker">统一入口演示</p><h2 id="router-title">同一个问题入口，按意图选择不同执行链</h2></div>
+          <span className="demo-label">交互式架构演示</span>
+        </div>
+        <div className="scenario-tabs" role="tablist" aria-label="问题场景">
+          {ROUTE_SCENARIOS.map((item) => (
+            <button type="button" role="tab" aria-selected={item.id === scenarioId} className={item.id === scenarioId ? "active" : ""} onClick={() => setScenarioId(item.id)} key={item.id}>
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <div className="route-workbench">
+          <div className="route-question">
+            <span>POST /chat</span>
+            <blockquote>{scenario.question}</blockquote>
+            <div><small>识别意图</small><strong>{scenario.intent}</strong></div>
+            <div><small>目标 Agent</small><strong>{scenario.agent}</strong></div>
+          </div>
+          <ol className="route-steps">
+            {scenario.steps.map((step, index) => <li key={step}><span>{index + 1}</span><p>{step}</p></li>)}
+          </ol>
+          <div className="route-outcome">
+            <span>编排结果</span>
+            <strong>{scenario.agent}</strong>
+            <p>{scenario.summary}</p>
+            {scenario.id === "data" ? <a href="#data-lab">进入下方真实数据实验室 ↓</a> : <small>本分支由仓库后端实现，Pages 仅展示调用流程。</small>}
+          </div>
+        </div>
+      </div>
+
+      <div className="architecture-showcase" id="architecture">
+        <div className="section-heading">
+          <div><p className="section-kicker">系统全景</p><h2>仓库中的三层职责与主调用链</h2></div>
+          <a href="https://github.com/hachiwar/InsightFlow/blob/main/docs/architecture.md" target="_blank" rel="noreferrer">阅读架构文档 ↗</a>
+        </div>
+        <div className="system-flow" aria-label="完整系统调用链">
+          <span>用户 / 业务系统</span><b>→</b><span>Caddy + API Key</span><b>→</b><span>EchoMind /chat</span><b>→</b><span>记忆 + RAG + 意图路由</span><b>→</b><span>专业 Agent</span><b>→</b><span>AskData（数据意图）</span>
+        </div>
+        <div className="capability-groups">
+          {CAPABILITY_GROUPS.map((group) => (
+            <article key={group.title}>
+              <div><h3>{group.title}</h3><span>{group.description}</span></div>
+              <ul>{group.items.map((item) => <li key={item}>{item}</li>)}</ul>
+            </article>
+          ))}
+        </div>
+        <div className="memory-rag-strip">
+          <div><span>工作记忆</span><strong>Redis 会话消息 + TTL</strong><small>保留最近对话，达到阈值后压缩</small></div>
+          <div><span>情节记忆</span><strong>摘要检索 + 持久化</strong><small>按当前问题召回相关历史</small></div>
+          <div><span>企业知识 RAG</span><strong>查询改写 + 并行召回 + Rerank</strong><small>熔断、缓存和降级路径可追踪</small></div>
+          <div><span>回答治理</span><strong>依据校验 + 人工升级</strong><small>监控 Agent 成功率、延迟和告警</small></div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function OperationsShowcase() {
+  return (
+    <section className="operations-showcase" id="operations" aria-labelledby="operations-title">
+      <div className="section-heading">
+        <div><p className="section-kicker">安全、降级与上线</p><h2 id="operations-title">从模型输出到数据库执行，关键边界均可复核</h2></div>
+        <span className="demo-label">仓库实现状态</span>
+      </div>
+      <div className="operations-grid">
+        <article><span className="operation-number">01</span><h3>入口隔离</h3><p>Caddy 只公开 80/443；EchoMind、AskData 和 Redis 仅在容器内部通信。公开 API 与内部调用使用不同密钥。</p></article>
+        <article><span className="operation-number">02</span><h3>只读执行</h3><p>后端 SQLite 使用只读连接、查询模式、超时和 100 行上限。页面还会在执行前拒绝写操作和多语句。</p></article>
+        <article><span className="operation-number">03</span><h3>失败降级</h3><p>知识工具包含超时、缓存与熔断；专业 Agent 失败时可降级到 GeneralAgent。页面模型解释失败时回退本地总结。</p></article>
+        <article><span className="operation-number">04</span><h3>上线验证</h3><p>Compose 提供健康检查，Caddy 管理 HTTPS，并通过冒烟测试验证鉴权、服务状态和 EchoMind → AskData 数据链路。</p></article>
+      </div>
+      <div className="truth-table">
+        <div><strong>本页已完整覆盖</strong><span>项目定位、统一入口、四类 Agent 路由、记忆、RAG、Text2SQL、安全、降级、监控评测与部署拓扑。</span></div>
+        <div><strong>Pages 中真实执行</strong><span>样例 Schema、SQLite 查询、SQL 只读拦截、结果表格，以及可选的用户自带模型调用。</span></div>
+        <div><strong>生产环境仍需补齐</strong><span>真实数据源白名单、表字段权限、SQL 审计、结果一致性校验、多数据库适配和专用评测集。</span></div>
+      </div>
+      <div className="operations-links">
+        <a href="https://github.com/hachiwar/InsightFlow/blob/main/docs/status.md" target="_blank" rel="noreferrer">查看实现状态 ↗</a>
+        <a href="https://github.com/hachiwar/InsightFlow/blob/main/docs/InsightFlow%E5%9B%BD%E5%86%85%E6%9C%8D%E5%8A%A1%E5%99%A8%E4%B8%8A%E7%BA%BF%E6%8C%87%E5%8D%97.md" target="_blank" rel="noreferrer">查看服务器上线指南 ↗</a>
+      </div>
+    </section>
+  );
+}
 
 function ResultTable({ result }) {
   if (!result) return <div className="empty-state">运行一次分析后，这里会显示 SQLite 的真实查询结果。</div>;
@@ -252,16 +420,24 @@ export default function App() {
       <header className="topbar">
         <a className="brand" href="./" aria-label="InsightFlow 首页">
           <span className="brand-mark" aria-hidden="true">IF</span>
-          <span><strong>InsightFlow</strong><small>数据推理实验室</small></span>
+          <span><strong>InsightFlow</strong><small>企业知识与数据问答 Agent</small></span>
         </a>
+        <nav className="topbar-nav" aria-label="页面导航"><a href="#overview">项目总览</a><a href="#data-lab">数据实验室</a><a href="#operations">安全与上线</a></nav>
+        <a className="github-link" href="https://github.com/hachiwar/InsightFlow" target="_blank" rel="noreferrer">查看 GitHub ↗</a>
+      </header>
+
+      <ProjectShowcase />
+
+      <section className="lab-intro" id="data-lab" aria-labelledby="lab-title">
+        <div><p className="section-kicker">真实可运行范例</p><h2 id="lab-title">AskData 数据推理实验室</h2></div>
+        <p>选择复杂业务问题，查看从关键词识别、Schema 召回、查询规划、SQL 生成到实际数据与问题导向解释的完整链路。</p>
         <div className="topbar-badges">
           <span className={modelEnabled ? "badge model" : "badge local"}>{modelEnabled ? "自定义模型模式" : "本地演示模式"}</span>
           <span className="badge private">样例数据仅在浏览器内</span>
         </div>
-        <a className="github-link" href="https://github.com/hachiwar/InsightFlow" target="_blank" rel="noreferrer">查看 GitHub ↗</a>
-      </header>
+      </section>
 
-      <main className="workspace">
+      <main className="workspace" aria-label="AskData 数据推理实验室">
         <aside className="query-panel" aria-labelledby="query-title">
           <div className="panel-heading">
             <div><p className="section-kicker">自然语言入口</p><h1 id="query-title">提出业务问题</h1></div>
@@ -364,6 +540,7 @@ export default function App() {
         </aside>
       </main>
       <AgentFlow />
+      <OperationsShowcase />
       <footer>这是公开样例数据与浏览器沙盒，不连接真实银行或企业数据库，也不构成经营决策建议。</footer>
     </div>
   );

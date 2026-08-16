@@ -32,7 +32,7 @@
 | CoT 四元组规划 | 已实现 | Mock 仅在显式启用时接受演示查询 |
 | SQL 生成 | 已实现 | 公开部署默认禁用 Mock |
 | SQLite 查询执行 | 已实现 | 只读连接、执行超时、最多返回 100 行 |
-| GitHub Pages 范例站 | 已实现 | 浏览器内 SQLite、3 个复杂多表场景和完整执行轨迹 |
+| GitHub Pages 项目展示站 | 已实现 | 交互展示统一入口、四类 Agent、记忆、RAG、Text2SQL、安全与部署；浏览器内真实运行 SQLite、3 个复杂多表场景和完整执行轨迹 |
 | 自定义模型 Text2SQL | 已实现（演示） | 浏览器调用用户填写的 OpenAI 兼容端点；受端点 CORS 策略限制 |
 | 前端 SQL 只读检查 | 已实现 | 仅允许单条 `SELECT` / `WITH`，拒绝写入与结构变更关键字 |
 | 单机容器部署 | 已实现 | 根级 Compose 启动 Caddy、EchoMind、AskData 和 Redis |
