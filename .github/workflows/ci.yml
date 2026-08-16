@@ -14,9 +14,9 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements-runtime.txt
-        working-directory: dataagent/code/dataagent_agent/dataagent_agent
+        working-directory: dataagent
       - run: python -m unittest discover -s tests -v
-        working-directory: dataagent/code/dataagent_agent/dataagent_agent
+        working-directory: dataagent
 
       - uses: actions/setup-java@v4
         with:
@@ -24,7 +24,7 @@ jobs:
           java-version: "21"
           cache: maven
       - run: mvn --batch-mode test
-        working-directory: mindagent/MindAgentJava/MindAgentJava
+        working-directory: mindagent
 
       - uses: actions/setup-node@v6
         with:

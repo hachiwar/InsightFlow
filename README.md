@@ -3,7 +3,7 @@
 [![CI](https://github.com/hachiwar/InsightFlow/actions/workflows/ci.yml/badge.svg)](https://github.com/hachiwar/InsightFlow/actions/workflows/ci.yml)
 [![GitHub Pages](https://github.com/hachiwar/InsightFlow/actions/workflows/pages.yml/badge.svg)](https://github.com/hachiwar/InsightFlow/actions/workflows/pages.yml)
 
-[在线演示](https://hachiwar.github.io/InsightFlow/) · [架构设计](docs/architecture.md) · [国内服务器上线指南](docs/InsightFlow国内服务器上线指南.md)
+[在线演示](https://hachiwar.github.io/InsightFlow/) · [DataAgent 源码](dataagent/) · [MindAgent 源码](mindagent/) · [前端源码](demo-site/) · [架构设计](docs/architecture.md) · [国内服务器上线指南](docs/InsightFlow国内服务器上线指南.md)
 
 InsightFlow 是一套面向企业知识问答与结构化数据分析的 Agent 工程。MindAgent 负责会话记忆、知识库 RAG、意图识别和多 Agent 编排；DataAgent 负责把自然语言数据问题转换为经过治理、执行、校验和解释的 SQL。仓库包含 Java 与 Python 后端、浏览器内 SQLite 交互范例、Docker Compose 部署、接口文档和自动化测试。
 
@@ -119,7 +119,7 @@ Compose 启动 `proxy`、`mindagent`、`dataagent` 和 `redis`。只有 Caddy �
 ### DataAgent
 
 ```powershell
-cd dataagent/code/dataagent_agent/dataagent_agent
+cd dataagent
 $env:PYTHONIOENCODING = "utf-8"
 $env:DATAAGENT_ALLOW_MOCK = "true"
 python -m dataagent_pipeline.http_server
@@ -139,7 +139,7 @@ curl -X POST http://127.0.0.1:8090/query \
 ### MindAgent
 
 ```powershell
-cd mindagent/MindAgentJava/MindAgentJava
+cd mindagent
 $env:SPRING_PROFILES_ACTIVE = "deepseek"
 $env:DEEPSEEK_API_KEY = "your-key"
 mvn spring-boot:run
@@ -209,11 +209,11 @@ MindAgent 优先使用 `answer` 组织对话回复，同时保留 SQL 和校验�
 
 ```bash
 # Python：SQL 安全、白名单、审计、结果校验与完整 Pipeline
-cd dataagent/code/dataagent_agent/dataagent_agent
+cd dataagent
 python -m unittest discover -s tests -v
 
 # Java：MindAgent 单元与集成测试
-cd mindagent/MindAgentJava/MindAgentJava
+cd mindagent
 mvn --batch-mode test
 
 # 前端：3 个复杂场景、安全拦截、模型解释与修复协议
@@ -231,8 +231,18 @@ GitHub Actions 对 `main` 和 Pull Request 自动执行上述 Python、Java、�
 
 ```text
 InsightFlow/
-├── dataagent/       # Python Text2SQL、HTTP API、SQLite 执行与测试
+├── dataagent/       # Python Text2SQL、Schema 检索、SQL 治理、HTTP API 与测试
+│   ├── dataagent_pipeline/
+│   ├── schema_indexing/
+│   ├── schema_retrieval/
+│   ├── cot_planning/
+│   ├── sql_generation/
+│   ├── mcp_router/
+│   └── tests/
 ├── mindagent/       # Java Spring Boot 对话编排、RAG、记忆、评测与测试
+│   ├── src/main/java/com/mindagent/
+│   ├── src/main/resources/
+│   └── src/test/
 ├── demo-site/       # React + sql.js 的 GitHub Pages 交互范例
 ├── deploy/          # Caddy 反向代理配置
 ├── scripts/         # 部署冒烟测试
@@ -240,6 +250,12 @@ InsightFlow/
 ├── compose.yaml     # 完整服务编排
 └── .env.example     # 无密钥配置模板
 ```
+
+两个后端模块均直接位于仓库一级目录，不需要进入重复的同名工程目录：
+
+- [DataAgent 源码与模块说明](dataagent/README.md)
+- [MindAgent 源码与模块说明](mindagent/README.md)
+- [在线范例源码](demo-site/src)
 
 ## 复现与检查
 
