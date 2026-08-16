@@ -12,15 +12,12 @@ class SchemaRetriever:
     """
     字段级 Schema 检索器。
 
-    当前 Demo 实现：
+    SchemaRetriever 提供：
     - 字段级文档构建
     - BM25关键词召回
     - 简单业务别名 boost
 
-    后续扩展：
-    - 加 VectorIndex
-    - 加 Reranker
-    - 加 LLM Query 关键词提取
+    HybridSchemaRetrievalService 在此基础上组合向量召回、Rerank 和关键词提取。
     """
 
     def __init__(
@@ -74,7 +71,7 @@ class SchemaRetriever:
         - Query 直接包含字段名、字段别名、表别名时加分。
         - Query token 与字段描述 token 重合时加分。
 
-        这部分后续可以替换为 rerank 模型。
+        该规则分数与上层 Rerank 结果共同参与混合排序。
         """
         query_lower = query.lower()
         query_tokens = set(tokenize(query))
