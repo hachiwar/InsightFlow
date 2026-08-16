@@ -218,12 +218,12 @@ InsightFlow/
 └── .env.example     # 无密钥配置模板
 ```
 
-## 面试演示建议
+## 项目验证路径
 
-1. 用 2 分钟解释 MindAgent / DataAgent 的职责边界；
+1. 查看 MindAgent / DataAgent 的职责边界；
 2. 在在线站点运行“盈利下降”或“存款未消费”场景，逐步查看关键词、Schema、计划、SQL、结果和解释；
 3. 把 SQL 改成 `DELETE`，证明执行前会被拒绝；
 4. 展示 DataAgent 的 `verified` 与 `audit` 返回；
-5. 最后说明 Compose 的网络隔离、双密钥和冒烟测试。
+5. 检查 Compose 的网络隔离、双密钥和冒烟测试。
 
 详细契约与关键取舍见[架构设计](docs/architecture.md)。
