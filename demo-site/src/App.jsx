@@ -199,9 +199,10 @@ export default function App() {
   const [activeSection, setActiveSection] = useState("overview");
   useEffect(() => {
     const sections = NAV_ITEMS.map(([id]) => document.getElementById(id)).filter(Boolean);
-    const observer = new IntersectionObserver((entries) => { const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]; if (visible) setActiveSection(visible.target.id); }, { rootMargin: "-15% 0px -65%", threshold: [0, 0.2, 0.6] });
-    sections.forEach((section) => observer.observe(section));
-    return () => observer.disconnect();
+    const syncActiveSection = () => { const marker = window.innerHeight * .28; const current = sections.filter((section) => section.getBoundingClientRect().top <= marker).at(-1) ?? sections[0]; setActiveSection(current.id); };
+    syncActiveSection();
+    window.addEventListener("scroll", syncActiveSection, { passive: true });
+    return () => window.removeEventListener("scroll", syncActiveSection);
   }, []);
   return <div className="app-shell"><a className="skip-link" href="#main">跳到主要内容</a><Sidebar activeSection={activeSection} /><main id="main"><Overview /><Architecture /><Orchestration /><DataLab /><Security /><Deployment /><footer>InsightFlow · 公开样例数据仅用于工程演示，不连接真实企业或银行数据库。</footer></main></div>;
 }
