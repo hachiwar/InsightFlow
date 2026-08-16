@@ -27,7 +27,7 @@ def request_json(
 def main() -> None:
     parser = argparse.ArgumentParser(description="InsightFlow deployment smoke test")
     parser.add_argument("--base-url", default="http://127.0.0.1")
-    parser.add_argument("--api-key", default=os.getenv("ECHOMIND_API_KEY", ""))
+    parser.add_argument("--api-key", default=os.getenv("MINDAGENT_API_KEY", ""))
     parser.add_argument("--skip-chat", action="store_true")
     args = parser.parse_args()
 
@@ -40,7 +40,7 @@ def main() -> None:
     if args.skip_chat:
         return
     if not args.api_key:
-        parser.error("--api-key or ECHOMIND_API_KEY is required for the chat check")
+        parser.error("--api-key or MINDAGENT_API_KEY is required for the chat check")
 
     chat = request_json(
         f"{base_url}/chat",

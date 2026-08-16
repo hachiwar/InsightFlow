@@ -20,20 +20,20 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  askdata:
+  dataagent:
     build:
-      context: ./askdata/code/askdata_agent/askdata_agent
+      context: ./dataagent/code/dataagent_agent/dataagent_agent
     restart: unless-stopped
     init: true
     read_only: true
     environment:
-      ASKDATA_API_KEY: ${ASKDATA_API_KEY:?Set ASKDATA_API_KEY in .env}
-      ASKDATA_ALLOW_MOCK: ${ASKDATA_ALLOW_MOCK:-false}
-      ASKDATA_MAX_REQUEST_BYTES: ${ASKDATA_MAX_REQUEST_BYTES:-65536}
+      DATAAGENT_API_KEY: ${DATAAGENT_API_KEY:?Set DATAAGENT_API_KEY in .env}
+      DATAAGENT_ALLOW_MOCK: ${DATAAGENT_ALLOW_MOCK:-false}
+      DATAAGENT_MAX_REQUEST_BYTES: ${DATAAGENT_MAX_REQUEST_BYTES:-65536}
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
       DASHSCOPE_WORKSPACE_ID: ${DASHSCOPE_WORKSPACE_ID:-}
     volumes:
-      - askdata-data:/app/runtime_data
+      - dataagent-data:/app/runtime_data
     tmpfs:
       - /tmp
     healthcheck:
@@ -49,43 +49,43 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  echomind:
+  mindagent:
     build:
-      context: ./echomind/EchoMindJava/EchoMindJava
+      context: ./mindagent/MindAgentJava/MindAgentJava
     restart: unless-stopped
     init: true
     read_only: true
     environment:
       SERVER_PORT: 8080
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-deepseek}
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-echomind-local-placeholder}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-mindagent-local-placeholder}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-echomind-local-placeholder}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-mindagent-local-placeholder}
       ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-https://api.anthropic.com}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5}
       LLM_FALLBACK_ENABLED: ${LLM_FALLBACK_ENABLED:-false}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
-      ASKDATA_BASE_URL: http://askdata:8090
-      ASKDATA_TIMEOUT_MS: ${ASKDATA_TIMEOUT_MS:-30000}
-      ASKDATA_API_KEY: ${ASKDATA_API_KEY:?Set ASKDATA_API_KEY in .env}
-      ECHOMIND_AUTH_ENABLED: "true"
-      ECHOMIND_API_KEY: ${ECHOMIND_API_KEY:?Set ECHOMIND_API_KEY in .env}
-      ECHOMIND_DATA_DIR: /app/data/java
+      DATAAGENT_BASE_URL: http://dataagent:8090
+      DATAAGENT_TIMEOUT_MS: ${DATAAGENT_TIMEOUT_MS:-30000}
+      DATAAGENT_API_KEY: ${DATAAGENT_API_KEY:?Set DATAAGENT_API_KEY in .env}
+      MINDAGENT_AUTH_ENABLED: "true"
+      MINDAGENT_API_KEY: ${MINDAGENT_API_KEY:?Set MINDAGENT_API_KEY in .env}
+      MINDAGENT_DATA_DIR: /app/data/java
       KNOWLEDGE_STORE_PATH: /app/data/java/knowledge-store.json
       MEMORY_STORE_PATH: /app/data/java/memory-store.json
       EVAL_BASELINE_PATH: /app/data/java/eval-baseline.json
       JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75.0}
     volumes:
-      - echomind-data:/app/data
+      - mindagent-data:/app/data
     tmpfs:
       - /tmp
     depends_on:
       redis:
         condition: service_healthy
-      askdata:
+      dataagent:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/health"]
@@ -110,14 +110,14 @@ services:
       - caddy-data:/data
       - caddy-config:/config
     depends_on:
-      echomind:
+      mindagent:
         condition: service_healthy
     security_opt:
       - no-new-privileges:true
 
 volumes:
   redis-data:
-  askdata-data:
-  echomind-data:
+  dataagent-data:
+  mindagent-data:
   caddy-data:
   caddy-config:

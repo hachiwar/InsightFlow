@@ -15,19 +15,19 @@ GitHub Pages 只托管构建后的 HTML、CSS、JavaScript 和 WebAssembly 静�
   └── 可选模型端点：使用访问者临时填写的 API Key 生成 SQL
 ```
 
-这与根目录 `compose.yaml` 的完整后端部署不同。GitHub Pages 展示完整项目架构，并在浏览器内真实运行 Text2SQL 样例；Docker Compose 部署用于实际运行 EchoMind、AskData、Redis 和 Caddy 服务。
+这与根目录 `compose.yaml` 的完整后端部署不同。GitHub Pages 展示完整项目架构，并在浏览器内真实运行 Text2SQL 样例；Docker Compose 部署用于实际运行 MindAgent、DataAgent、Redis 和 Caddy 服务。
 
 ## 2. 当前范例包含什么
 
 项目总览展示以下仓库主流程：
 
-- EchoMind 统一 `/chat` 入口、API 鉴权和会话上下文；
+- MindAgent 统一 `/chat` 入口、API 鉴权和会话上下文；
 - 知识问答、技术支持、账单账户和数据分析四类意图路由；
 - 工作记忆、情节记忆、用户画像、知识库 RAG 和回答校验；
-- DataAgent → AskData 的跨服务数据查询链路；
-- EchoMind、AskData 和部署层的职责边界；
+- MindAgent 数据路由 → DataAgent 的跨服务数据查询链路；
+- MindAgent、DataAgent 和部署层的职责边界；
 - 熔断、Agent 降级、监控、评测、只读执行和容器隔离；
-- Caddy、EchoMind、AskData、Redis 的生产部署拓扑。
+- Caddy、MindAgent、DataAgent、Redis 的生产部署拓扑。
 
 上述 Java、Python 和容器能力属于交互式架构展示，不会在 GitHub Pages 内启动。数据实验室真实包含：
 
@@ -84,7 +84,7 @@ https://hachiwar.github.io/InsightFlow/
 
 - [ ] 项目总览明确说明“真实运行”“可选运行”和“架构展示”的边界；
 - [ ] 统一入口可以切换知识问答、技术支持、账单账户和数据分析四类路由；
-- [ ] 页面展示 EchoMind、AskData、部署三层职责，以及记忆、RAG、安全和上线流程；
+- [ ] 页面展示 MindAgent、DataAgent、部署三层职责，以及记忆、RAG、安全和上线流程；
 - [ ] 数据实验室显示“本地演示模式”和“样例数据仅在浏览器内”；
 - [ ] 样例数据库显示 5 张表及其字段；
 - [ ] 默认问题自动完成 6 个阶段；
@@ -148,7 +148,7 @@ GitHub Pages 范例站不能安全替代 InsightFlow 后端，不能用于：
 - 连接内网或生产数据库；
 - 实施用户登录、数据库行列权限和 SQL 审计；
 - 保存对话历史或业务数据；
-- 运行 EchoMind Java 服务、AskData Python 服务或 Redis；
+- 运行 MindAgent Java 服务、DataAgent Python 服务或 Redis；
 - 对外提供生产级 Text2SQL 服务。
 
 需要上述能力时，应按照[国内服务器上线指南](InsightFlow国内服务器上线指南.md)部署完整后端，并在接入真实数据前完成数据权限、审计、备份和隐私审查。

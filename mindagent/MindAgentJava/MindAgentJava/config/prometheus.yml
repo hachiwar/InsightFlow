@@ -1,0 +1,21 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: mindagent-java
+    environment: production
+
+scrape_configs:
+  - job_name: mindagent-java-app
+    metrics_path: /metrics
+    scrape_interval: 10s
+    static_configs:
+      - targets:
+          - mindagent-java:8080
+        labels:
+          service: mindagent-java
+
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost:9090

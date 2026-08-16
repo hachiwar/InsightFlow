@@ -12,7 +12,7 @@
 		Referrer-Policy no-referrer
 	}
 
-	reverse_proxy echomind:8080 {
+	reverse_proxy mindagent:8080 {
 		health_uri /health
 		health_interval 30s
 		health_timeout 5s
