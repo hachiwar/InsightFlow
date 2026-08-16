@@ -17,7 +17,7 @@ GitHub Pages 只托管构建后的 HTML、CSS、JavaScript 和 WebAssembly 静�
 
 这与根目录 `compose.yaml` 的完整后端部署不同。GitHub Pages 展示完整项目架构，并在浏览器内真实运行 Text2SQL 样例；Docker Compose 部署用于实际运行 MindAgent、DataAgent、Redis 和 Caddy 服务。
 
-## 2. 当前范例包含什么
+## 2. 范例站内容
 
 项目总览展示以下仓库主流程：
 
@@ -38,17 +38,16 @@ GitHub Pages 只托管构建后的 HTML、CSS、JavaScript 和 WebAssembly 静�
 - 单条 `SELECT` / `WITH` 安全检查和最多 100 行结果限制；
 - 可选的 OpenAI 兼容模型端点、模型名称和临时 API Key 输入。
 
-本地演示模式只覆盖 3 个经过验证的场景，不宣称能够处理任意问题。启用自定义模型后，模型会根据当前问题和召回的 Schema 动态生成 SQL。
+本地演示模式提供 3 个可复现的复杂场景；启用自定义模型后，模型会根据输入问题和召回的 Schema 动态生成 SQL、修复执行错误并解释真实查询结果。
 
-## 3. 合并代码到 `main`
+## 3. 发布分支
 
-GitHub Pages 工作流只在 `main` 分支发布。先打开仓库中的 Draft PR，确认 CI 通过，然后将其合并到 `main`：
+GitHub Pages 工作流在 `main` 分支更新后发布。每次发布前：
 
-1. 打开当前待合并的 InsightFlow Pull Request。
-2. 确认 `verify` 检查为绿色。
-3. 将 Draft PR 转为可审查状态。
-4. 单击 `Merge pull request`。
-5. 打开 `main` 分支，确认存在 `demo-site` 和 `.github/workflows/pages.yml`。
+1. 在功能分支运行 `npm test` 和 `npm run build`；
+2. 创建 Pull Request，并确认 `verify` 检查通过；
+3. 合并到 `main`；
+4. 在 Actions 中查看 `Deploy demo to GitHub Pages`。
 
 ## 4. 在 GitHub 中启用 Pages
 
@@ -82,10 +81,10 @@ https://hachiwar.github.io/InsightFlow/
 
 打开公开地址后，按以下顺序检查：
 
-- [ ] 项目总览明确说明“真实运行”“可选运行”和“架构展示”的边界；
-- [ ] 统一入口可以切换知识问答、技术支持、账单账户和数据分析四类路由；
-- [ ] 页面展示 MindAgent、DataAgent、部署三层职责，以及记忆、RAG、安全和上线流程；
-- [ ] 数据实验室显示“本地演示模式”和“样例数据仅在浏览器内”；
+- [ ] 左侧导航包含项目总览、系统架构、Agent 编排、数据链路、安全治理、部署运行和简历要点；
+- [ ] Agent 编排可以切换知识问答、技术支持、账单账户和数据分析四类路由；
+- [ ] 页面展示 MindAgent、DataAgent 与 Runtime 三层职责；
+- [ ] 数据链路明确说明样例数据库在浏览器内执行；
 - [ ] 样例数据库显示 5 张表及其字段；
 - [ ] 默认问题自动完成 6 个阶段；
 - [ ] 生成 SQL 只包含 `SELECT` 或 `WITH` 查询；
@@ -140,9 +139,9 @@ npm run build
 
 构建产物位于 `demo-site/dist`，该目录由 Git 忽略，不需要提交。推送到 `main` 后，GitHub Actions 会重新测试、构建并发布。
 
-## 10. 不能用 GitHub Pages 完成的事项
+## 10. GitHub Pages 使用边界
 
-GitHub Pages 范例站不能安全替代 InsightFlow 后端，不能用于：
+GitHub Pages 是公开静态托管，适合展示和浏览器沙盒，不用于：
 
 - 保存平台统一模型密钥；
 - 连接内网或生产数据库；

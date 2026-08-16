@@ -50,7 +50,16 @@ public class DataAgentClient {
     }
 
     private String format(Map<String, Object> result) {
-        StringBuilder answer = new StringBuilder("数据查询完成。\n");
+        StringBuilder answer = new StringBuilder();
+        Object summary = result.get("answer");
+        if (summary instanceof String text && !text.isBlank()) {
+            answer.append(text).append("\n");
+        } else {
+            answer.append("数据查询完成。\n");
+        }
+        if (Boolean.TRUE.equals(result.get("verified"))) {
+            answer.append("结果一致性校验：通过。\n");
+        }
         Object logs = result.get("step_logs");
         if (logs instanceof List<?> steps) {
             for (Object value : steps) {

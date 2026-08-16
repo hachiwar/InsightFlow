@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 import sqlite3
 import time
 from pathlib import Path
@@ -8,6 +7,11 @@ from typing import Any, Dict, List
 from urllib.parse import quote
 
 from .objects import MCPExecutionRequest, MCPExecutionResult
+from .query_governance import (
+    SqlValidation,
+    build_audit_record,
+    validate_readonly_sql,
+)
 
 
 class SQLiteMCPExecutor:
@@ -25,34 +29,57 @@ class SQLiteMCPExecutor:
         timeout: int = 30,
         readonly: bool = True,
         max_rows: int = 100,
+        allowed_tables: set[str] | None = None,
     ):
         self.database = database
         self.db_path = str(db_path)
         self.timeout = timeout
         self.readonly = readonly
         self.max_rows = max_rows
+        self.allowed_tables = allowed_tables
 
     def execute(self, request: MCPExecutionRequest) -> MCPExecutionResult:
         """
         执行 SQL。
         """
+        started_at = time.monotonic()
         if request.database != self.database:
+            error = f"数据库路由错误：当前执行器只处理 {self.database}"
             return MCPExecutionResult(
                 database=request.database,
                 sql=request.sql,
                 success=False,
-                error=f"数据库路由错误：当前执行器只处理 {self.database}",
+                error=error,
+                audit=build_audit_record(
+                    database=request.database,
+                    sql=request.sql,
+                    started_at=started_at,
+                    success=False,
+                    error=error,
+                ),
             )
 
         sql = request.sql.strip()
 
-        if self.readonly and not self._is_readonly_sql(sql):
-            return MCPExecutionResult(
-                database=request.database,
-                sql=sql,
-                success=False,
-                error="只允许执行 SELECT / WITH 查询。",
-            )
+        validation: SqlValidation | None = None
+        if self.readonly:
+            try:
+                validation = validate_readonly_sql(sql, self.allowed_tables)
+            except ValueError as exc:
+                error = str(exc)
+                return MCPExecutionResult(
+                    database=request.database,
+                    sql=sql,
+                    success=False,
+                    error=error,
+                    audit=build_audit_record(
+                        database=request.database,
+                        sql=sql,
+                        started_at=started_at,
+                        success=False,
+                        error=error,
+                    ),
+                )
 
         conn: sqlite3.Connection | None = None
         try:
@@ -90,22 +117,31 @@ class SQLiteMCPExecutor:
                 rows=result_rows,
                 row_count=len(result_rows),
                 truncated=truncated,
+                audit=build_audit_record(
+                    database=request.database,
+                    sql=sql,
+                    started_at=started_at,
+                    success=True,
+                    validation=validation,
+                ),
             )
 
         except Exception as exc:
+            error = str(exc)
             return MCPExecutionResult(
                 database=request.database,
                 sql=sql,
                 success=False,
-                error=str(exc),
+                error=error,
+                audit=build_audit_record(
+                    database=request.database,
+                    sql=sql,
+                    started_at=started_at,
+                    success=False,
+                    validation=validation,
+                    error=error,
+                ),
             )
         finally:
             if conn is not None:
                 conn.close()
-
-    def _is_readonly_sql(self, sql: str) -> bool:
-        """
-        判断是否为只读 SQL。
-        """
-        normalized = re.sub(r"\s+", " ", sql.strip()).lower()
-        return normalized.startswith("select ") or normalized.startswith("with ")

@@ -22,20 +22,20 @@ from sql_generation import (
 from .demo_data import create_trade_demo_database, get_trade_business_meta
 from .local_clients import LocalHashEmbeddingClient, SimpleKeywordExtractor
 from .objects import PipelineConfig, PipelineResult, StepExecutionLog
+from .result_quality import summarize_step_logs, verify_step_logs
 
 
 class DataAgentText2SQLPipeline:
     """
     DataAgent Text2SQL 端到端流程。
 
-    当前实现串联：
+    完整链路串联：
     1. 创建测试数据库和 Schema 元数据
     2. Schema 检索与 SchemaGraph 构建
     3. CoT 四元组规划
     4. SQL 生成
-    5. MCP 路由执行
-
-    暂不包含结果校验与回调修正。
+    5. SQL 治理与数据库路由执行
+    6. 有限纠错、结果一致性校验和自然语言总结
     """
 
     def __init__(self, config: Optional[PipelineConfig] = None):
@@ -48,6 +48,9 @@ class DataAgentText2SQLPipeline:
         self.schema_retrieval_service = self._build_schema_retrieval_service()
         self.cot_planner = self._build_cot_planner()
         self.mcp_router = self._build_mcp_router()
+        self.coder_client = CoderModelClient(
+            CoderModelConfig(use_mock_when_no_api_key=self.config.allow_mock)
+        )
 
     def run(
         self,
@@ -76,11 +79,7 @@ class DataAgentText2SQLPipeline:
 
         sql_generator = SqlGenerator(
             schema_store=schema_store,
-            coder_client=CoderModelClient(
-                CoderModelConfig(
-                    use_mock_when_no_api_key=self.config.allow_mock,
-                )
-            ),
+            coder_client=self.coder_client,
         )
 
         step_logs: List[StepExecutionLog] = []
@@ -98,9 +97,30 @@ class DataAgentText2SQLPipeline:
 
             local_schema = schema_store.extract_local_schema(sql_cot_step)
             sql_result = sql_generator.generate(sql_cot_step)
+            attempts = []
+            execution_result = None
+            for attempt in range(self.config.max_repair_attempts + 1):
+                execution_request = sql_result.to_execution_request()
+                execution_result = self.mcp_router.execute(execution_request)
+                attempts.append(
+                    {
+                        "attempt": attempt + 1,
+                        "sql": sql_result.sql,
+                        "success": execution_result.success,
+                        "error": execution_result.error,
+                    }
+                )
+                if execution_result.success:
+                    break
+                if self.config.allow_mock or attempt >= self.config.max_repair_attempts:
+                    break
+                sql_result = sql_generator.repair(
+                    sql_cot_step,
+                    sql_result.sql,
+                    execution_result.error or "未知数据库错误",
+                )
 
-            execution_request = sql_result.to_execution_request()
-            execution_result = self.mcp_router.execute(execution_request)
+            assert execution_result is not None
 
             step_logs.append(
                 StepExecutionLog(
@@ -110,8 +130,12 @@ class DataAgentText2SQLPipeline:
                     sql=sql_result.sql,
                     execution_request=execution_request,
                     execution_result=execution_result.to_dict(),
+                    attempts=attempts,
                 )
             )
+
+        verification = verify_step_logs(step_logs)
+        answer = summarize_step_logs(query, step_logs, verification)
 
         return PipelineResult(
             query=query,
@@ -119,6 +143,8 @@ class DataAgentText2SQLPipeline:
             schema_context=schema_context,
             cot_output=cot_result.raw_output,
             step_logs=step_logs,
+            answer=answer,
+            verification=verification,
         )
 
     def _build_schema_retrieval_service(self) -> HybridSchemaRetrievalService:
@@ -188,6 +214,7 @@ class DataAgentText2SQLPipeline:
                 database=self.config.database_name,
                 db_path=self.db_path,
                 readonly=True,
+                allowed_tables=set(self.business_meta),
             ),
         )
 

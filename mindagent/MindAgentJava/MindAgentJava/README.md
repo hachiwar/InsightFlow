@@ -1,524 +1,172 @@
-# MindAgent Java 版本说明
+# MindAgent Java
 
-MindAgent Java 是 Python 版 MindAgent 的 Java/Spring 技术栈重构版，目录位于：
-
-
-
-当前版本已经覆盖智能客服主链路：对话请求、Redis 工作记忆、知识库检索、多 Agent 路由、Spring AI 模型调用、回答校验、评测、监控、Swagger 文档和 Docker 部署。
-
-## 技术栈
-
-| 类型 | 技术 |
-|------|------|
-| 语言 | Java 21 |
-| Web 框架 | Spring Boot 3.5 |
-| AI 框架 | Spring AI 1.1 |
-| LLM Provider | Anthropic、DeepSeek |
-| 文档处理 | LangChain4j DocumentSplitter |
-| 记忆缓存 | Spring Data Redis |
-| RAG | BM25 + 本地 hash vector + LLM rerank |
-| 持久化 | Redis 工作记忆 + JSON 知识库/长期记忆/用户画像 |
-| 监控 | Spring Boot Actuator、Micrometer、Prometheus |
-| API 文档 | Springdoc OpenAPI、Swagger UI |
-| 部署 | Docker、Docker Compose、Nginx、Prometheus |
-| 构建 | Maven Wrapper |
+MindAgent 是 InsightFlow 的统一对话与 Agent 编排服务。它基于 Java 21、Spring Boot 3.5 和 Spring AI，负责会话记忆、企业知识 RAG、意图识别、专业 Agent 路由、回答校验、评测和监控；数据分析问题通过 HTTP 调用 DataAgent。
 
 ## 核心链路
 
-数据分析问题会路由到 DataAgent：
-
-```text
-/chat -> DATA_QUERY -> MindAgent 数据路由 -> DataAgent /query -> 只读 SQL 执行
-```
-
-先在 DataAgent 工程目录启动：
-
-```bash
-python -m dataagent_pipeline.http_server
-```
-
-可通过 `DATAAGENT_BASE_URL` 和 `DATAAGENT_TIMEOUT_MS` 修改连接配置。
-
 ```text
 POST /chat
-  -> MemoryManager 读取 Redis 工作记忆、会话摘要、长期记忆、用户画像
-  -> KnowledgeToolManager 做查询改写、并行召回、LLM rerank
-  -> AgentOrchestrator 做意图识别和 Agent 路由
-  -> General / Technical / Billing Agent 生成回复
-  -> AnswerVerifier 校验回复是否可信、是否需要转人工
-  -> 写入 Redis，并异步更新用户画像
+→ 读取 Redis 工作记忆、历史摘要与用户画像
+→ 查询改写与企业知识 Hybrid RAG
+→ 识别 GENERAL / TECHNICAL / BILLING / DATA_QUERY
+→ GeneralAgent / TechnicalAgent / BillingAgent / DataAgent
+→ 回答校验与人工升级判断
+→ 写回会话和用户画像
+→ 返回 ChatResponse
 ```
 
-相关实现：
-
-- `src/main/java/com/mindagent/api/MindAgentController.java`
-- `src/main/java/com/mindagent/memory/MemoryManager.java`
-- `src/main/java/com/mindagent/tool/KnowledgeToolManager.java`
-- `src/main/java/com/mindagent/agent/AgentOrchestrator.java`
-- `src/main/java/com/mindagent/agent/AnswerVerifier.java`
-
-## Python 与 Java 版本对照
-
-| 能力 | Python 版本 | Java 版本 | 当前状态 |
-|------|-------------|-----------|----------|
-| Web 框架 | FastAPI | Spring Boot MVC | 已对齐 |
-| 模型调用 | Anthropic Async SDK | Spring AI ChatModel | 已对齐，调用栈不同 |
-| DeepSeek | 未内置 | Spring AI DeepSeek profile | Java 增强 |
-| Agent 类型 | General / Technical / Billing | General / Technical / Billing | 已对齐 |
-| Agent 路由 | 意图路由 + 性能路由 + 降级 | 意图路由 + 性能路由 + 降级 | 已对齐 |
-| 复合问题并行处理 | 支持 | 支持 | 已对齐 |
-| 意图识别 | LLM + embedding/hash + pattern | LLM + char n-gram semantic + pattern | 基本对齐 |
-| 工作记忆 | Redis | Redis | 已对齐 |
-| 情景记忆 | ChromaDB `episodic` collection | JSON 持久化 + 本地向量检索 | 功能对齐，存储不同 |
-| 用户画像 | ChromaDB `user_profile` collection | JSON 持久化 | 功能对齐，存储不同 |
-| 知识库 | ChromaDB `knowledge_base` collection | JSON 持久化 Hybrid RAG | 功能对齐，主检索实现不同 |
-| 查询改写 | LLM 改写 | LLM 改写 | 已对齐 |
-| 检索重排 | LLM rerank | LLM rerank，失败回退融合分 | 已对齐 |
-| 工具框架 | 通用 MCPToolManager | 专用 KnowledgeToolManager | 部分对齐 |
-| 熔断/缓存/超时/fallback | 支持 | 支持 | 已对齐到知识库工具 |
-| 评测 | Intent、Macro-F1、LLM Judge、baseline | Intent、Macro-F1、LLM Judge、baseline | 基本对齐 |
-| 监控 | Prometheus client、Webhook、Z-score | Actuator、Micrometer、Webhook、阈值告警 | 部分对齐 |
-| API 文档 | FastAPI `/docs` | Springdoc Swagger UI `/docs` | 已对齐 |
-| Docker | App、Redis、ChromaDB、Prometheus、Nginx | App、Redis、ChromaDB、Prometheus、Nginx | 已对齐 |
-| CLI | `api/main.py --cli` | 未实现 | Java 缺失 |
-
-## Java 版已补齐的能力
-
-### DeepSeek 兼容
-
-Java 版通过 Spring profile 切换模型：
-
-```env
-SPRING_PROFILES_ACTIVE=deepseek
-DEEPSEEK_API_KEY=your_key
-DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_MODEL=deepseek-v4-flash
-```
-
-当前还做了启动容错：缺少真实 API Key 时使用 `mindagent-local-placeholder` 避免 Spring AI 自动配置阶段直接失败。真实调用时如果没有配置真实 key，并且：
-
-```env
-LLM_FALLBACK_ENABLED=true
-```
-
-系统会返回本地降级回复。
-
-Anthropic 配置：
-
-```env
-SPRING_PROFILES_ACTIVE=anthropic
-ANTHROPIC_API_KEY=your_key
-ANTHROPIC_BASE_URL=https://api.anthropic.com
-ANTHROPIC_MODEL=claude-sonnet-5
-```
-
-### 记忆和知识库持久化
-
-Python 版：
-
-- Redis 保存工作记忆。
-- ChromaDB 保存情景记忆、用户画像和知识库。
-
-Java 版：
-
-- Redis 保存工作记忆。
-- `data/java/memory-store.json` 保存情景记忆和用户画像。
-- `data/java/knowledge-store.json` 保存知识库片段。
-- Docker 中保存到 `/app/data/java`，由 `app-data` volume 持久化。
-
-配置项：
-
-```env
-MINDAGENT_DATA_DIR=data/java
-KNOWLEDGE_STORE_PATH=data/java/knowledge-store.json
-MEMORY_STORE_PATH=data/java/memory-store.json
-EVAL_BASELINE_PATH=data/eval/baseline.json
-```
-
-当前用户可见效果已经对齐：应用重启后，导入的知识库、长期记忆和画像可以恢复。底层差异仍然存在：Java 没有直接写入 ChromaDB collection，而是 JSON 持久化 + 本地 hash vector 检索。
-
-### Hybrid RAG
-
-Python 版知识库主要通过 ChromaDB 做语义检索。
-
-Java 版当前检索链路：
+数据查询：
 
 ```text
-文档导入
-  -> LangChain4j recursive splitter
-  -> JSON 持久化
-  -> 本地 documents 索引
-
-查询
-  -> LLM 查询改写
-  -> 多子查询并行召回
-  -> BM25 关键词得分
-  -> 本地 hash vector 语义得分
-  -> 加权融合
-  -> LLM rerank
-  -> fallback 到融合分排序
+MindAgent DATA_QUERY
+→ DataAgentClient
+→ POST DataAgent /query
+→ answer + verification + SQL audit
+→ 组织为可读对话回复
 ```
 
-这比 Python 版多了 BM25 + vector 融合检索，但没有把 ChromaDB 作为主召回源。
+## 技术栈
 
-### 评测和监控
+| 类别 | 技术 |
+|---|---|
+| 语言与框架 | Java 21、Spring Boot 3.5、Spring AI 1.1 |
+| 模型 | DeepSeek、Anthropic Spring profile |
+| 记忆 | Redis 工作记忆、JSON 历史摘要与用户画像 |
+| 知识库 | BM25、本地 Hash Vector、加权融合、LLM Rerank |
+| 文档处理 | LangChain4j DocumentSplitter |
+| 可靠性 | 超时、缓存、熔断、Fallback、回答校验 |
+| 评测 | Intent Accuracy、Macro-F1、LLM-as-Judge、Baseline 回归 |
+| 监控 | Actuator、Micrometer、Prometheus、Webhook |
+| 文档与部署 | Springdoc OpenAPI、Docker、Docker Compose |
 
-Java 版已经实现：
+## 主要组件
 
-- Intent Accuracy
-- Macro-F1
-- per-class Precision / Recall / F1
-- LLM-as-Judge 四维评分
-- baseline 保存和回归检测
-- `/monitor`
-- `/metrics`
-- `/actuator/prometheus`
-- Webhook 告警
-- Agent 路由惩罚反馈
+| 组件 | 职责 |
+|---|---|
+| `MindAgentController` | 对话、知识库、监控和评测 API |
+| `MemoryManager` | 工作记忆、摘要、长期记忆和画像 |
+| `KnowledgeToolManager` | 查询改写、并行召回、融合、Rerank 与可靠性控制 |
+| `IntentRecognizer` | LLM、字符 n-gram 和模式规则融合识别 |
+| `AgentOrchestrator` | 专业 Agent 路由、复合问题并行和失败降级 |
+| `AnswerVerifier` | 可信度、依据和人工升级校验 |
+| `DataAgentClient` | DataAgent HTTP 契约与答案格式化 |
+| `EndToEndEvaluator` | 意图与回答质量评测、Baseline 对比 |
+| `PerformanceMonitor` | 成功率、延迟、指标和告警 |
 
-相关实现：
+## API
 
-- `src/main/java/com/mindagent/evaluation/EndToEndEvaluator.java`
-- `src/main/java/com/mindagent/evaluation/LLMJudge.java`
-- `src/main/java/com/mindagent/monitor/PerformanceMonitor.java`
-
-### Swagger / OpenAPI
-
-Python 版 FastAPI 默认提供 `/docs`。
-
-Java 版现在通过 Springdoc OpenAPI 提供同名入口：
-
-- Swagger UI：`http://localhost:8080/docs`
-- Nginx 代理：`http://localhost:8081/docs`
-- OpenAPI JSON：`http://localhost:8080/v3/api-docs`
-
-相关实现：
-
-- `pom.xml`
-- `src/main/resources/application.yml`
-- `src/main/java/com/mindagent/config/OpenApiConfig.java`
-- `src/main/java/com/mindagent/api/SwaggerDocsController.java`
-- `src/main/java/com/mindagent/api/MindAgentController.java`
-
-`/docs` 页面会从 jsdelivr CDN 加载 Swagger UI 静态资源；如果部署在不能访问外网的环境，需要把 Swagger UI 静态资源放到项目本地。
-
-## 当前仍然不同的地方
-
-### 通用 MCPToolManager 未完整迁移
-
-Python 版 `MCPToolManager` 可以注册任意 Tool，并统一处理：
-
-- register / unregister
-- JSON Schema 参数校验
-- timeout
-- circuit breaker
-- TTL cache
-- fallback
-- rerank
-- 工具统计
-
-Java 版当前是专用 `KnowledgeToolManager`，只服务 `knowledge_search`，但已经具备查询改写、并行召回、缓存、超时、熔断、fallback、rerank 和统计。
-
-要完全对齐，可以继续新增：
-
-- `ToolDefinition`
-- `ToolRegistry`
-- `ToolExecutor`
-- JSON Schema validator
-
-### ChromaDB 不是 Java 版主检索源
-
-Java 版保留 ChromaDB 容器，并引入了 Spring AI Chroma VectorStore starter，但当前 profile 中排除了 Chroma VectorStore 自动配置，主检索仍然走本地 Hybrid RAG。
-
-原因：
-
-- DeepSeek Chat starter 不提供 EmbeddingModel。
-- 当前实现优先保证 DeepSeek / Anthropic 都能启动和运行。
-
-后续可增强为：
-
-```text
-ChromaDB VectorStore semantic search
-  + BM25 keyword recall
-  + RRF / weighted fusion
-  + LLM rerank
-```
-
-### CLI 模式未迁移
-
-Python 版支持：
-
-```bash
-python api/main.py --cli
-```
-
-Java 版当前没有 CLI。如果需要对齐，可以使用 Spring Shell 或 `CommandLineRunner` 实现。
-
-### 监控算法仍有差异
-
-Python 版监控包含 Z-score 异常检测。
-
-Java 版当前是：
-
-- 成功率阈值告警
-- 平均延迟阈值告警
-- Webhook
-- Micrometer 指标
-- 路由惩罚反馈
-
-可继续补：
-
-- Z-score 异常检测
-- 告警 resolved 状态
-- 请求 latency histogram
-- tool success rate gauge
-
-## 主要接口
-
-默认端口：`8080`
+默认地址为 `http://127.0.0.1:8080`。
 
 | 方法 | 路径 | 说明 |
-|------|------|------|
+|---|---|---|
 | GET | `/health` | 健康检查 |
-| POST | `/chat` | 主对话接口 |
-| POST | `/search` | 知识库检索 |
+| POST | `/chat` | 统一对话入口 |
+| POST | `/search` | 企业知识检索 |
 | POST | `/knowledge/add` | 批量添加知识文档 |
-| POST | `/knowledge/upload` | 上传 `.txt` / `.md` / `.json` 文件 |
+| POST | `/knowledge/upload` | 上传 `.txt`、`.md`、`.json` |
 | GET | `/knowledge/stats` | 知识库统计 |
 | GET | `/monitor` | 监控摘要 |
-| GET | `/metrics` | Prometheus 指标，兼容 Python 版路径 |
-| GET | `/actuator/prometheus` | Spring Actuator Prometheus 指标 |
+| GET | `/metrics` | Prometheus 文本指标 |
+| GET | `/actuator/prometheus` | Actuator Prometheus 指标 |
 | POST | `/eval/run` | 运行评测 |
-| GET | `/docs` | Swagger UI，可在线调用接口 |
+| GET | `/docs` | Swagger UI |
 | GET | `/v3/api-docs` | OpenAPI JSON |
 
-Java 版配置了 Jackson `SNAKE_CASE`，响应字段会输出为：
+请求示例：
+
+```bash
+curl -X POST http://127.0.0.1:8080/chat \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "message":"近 6 个月收入增长但利润下降的月份有哪些？",
+    "user_id":"u1001",
+    "conversation_id":"demo-session"
+  }'
+```
+
+响应示例：
 
 ```json
 {
-  "conversation_id": "...",
+  "conversation_id": "demo-session",
   "response": "...",
-  "intent": "...",
-  "agent_type": "...",
+  "intent": "DATA_QUERY",
+  "agent_type": "data",
   "escalated": false,
   "latency_ms": 123,
-  "knowledge_used": true,
+  "knowledge_used": false,
   "verified": true,
   "grounded": true
 }
 ```
 
-和 Python 版主要差异：
+## 模型配置
 
-- Python 使用 `conv_id`。
-- Java 使用 `conversation_id`。
-- Java 额外返回 `verified` 和 `grounded`。
+### DeepSeek
 
-推荐请求字段：
+```bash
+export SPRING_PROFILES_ACTIVE=deepseek
+export DEEPSEEK_API_KEY=your-key
+export DEEPSEEK_BASE_URL=https://api.deepseek.com
+export DEEPSEEK_MODEL=deepseek-v4-flash
+```
 
-```json
-{
-  "message": "我想申请退款",
-  "user_id": "u1001",
-  "conversation_id": "optional-conversation-id"
-}
+### Anthropic
+
+```bash
+export SPRING_PROFILES_ACTIVE=anthropic
+export ANTHROPIC_API_KEY=your-key
+export ANTHROPIC_BASE_URL=https://api.anthropic.com
+export ANTHROPIC_MODEL=claude-sonnet-5
+```
+
+DataAgent 连接：
+
+```bash
+export DATAAGENT_BASE_URL=http://127.0.0.1:8090
+export DATAAGENT_TIMEOUT_MS=30000
+export DATAAGENT_API_KEY=your-internal-key
 ```
 
 ## 本地运行
 
-### macOS / Linux
-
-准备环境：
-
-- JDK 21 或更高版本
-- Docker Desktop 或 Docker Engine
-
-启动依赖：
+准备 JDK 21、Maven 和 Redis。先启动 DataAgent，再运行：
 
 ```bash
-docker compose up -d redis chromadb
-```
-
-DeepSeek 启动：
-
-```bash
-export SPRING_PROFILES_ACTIVE=deepseek
-export DEEPSEEK_API_KEY=your_key
-./mvnw spring-boot:run
-```
-
-Anthropic 启动：
-
-```bash
-export SPRING_PROFILES_ACTIVE=anthropic
-export ANTHROPIC_API_KEY=your_key
-./mvnw spring-boot:run
-```
-
-健康检查：
-
-```bash
-curl http://localhost:8080/health
-```
-
-Swagger：
-
-```text
-http://localhost:8080/docs
-```
-
-### Windows PowerShell
-
-启动依赖：
-
-```powershell
-docker compose up -d redis chromadb
-```
-
-DeepSeek 启动：
-
-```powershell
-$env:SPRING_PROFILES_ACTIVE="deepseek"
-$env:DEEPSEEK_API_KEY="your_key"
-.\mvnw.cmd spring-boot:run
-```
-
-Anthropic 启动：
-
-```powershell
-$env:SPRING_PROFILES_ACTIVE="anthropic"
-$env:ANTHROPIC_API_KEY="your_key"
-.\mvnw.cmd spring-boot:run
-```
-
-健康检查：
-
-```powershell
-curl http://localhost:8080/health
-```
-
-Swagger：
-
-```text
-http://localhost:8080/docs
-```
-
-## Docker 部署
-
-复制配置：
-
-```bash
-cp .env.example .env
+mvn spring-boot:run
 ```
 
 Windows PowerShell：
 
 ```powershell
-Copy-Item .env.example .env
+$env:SPRING_PROFILES_ACTIVE = "deepseek"
+$env:DEEPSEEK_API_KEY = "your-key"
+$env:DATAAGENT_BASE_URL = "http://127.0.0.1:8090"
+mvn spring-boot:run
 ```
 
-编辑 `.env`，选择模型 profile 并填写对应 API Key。
-
-启动：
+验证：
 
 ```bash
+curl http://127.0.0.1:8080/health
+```
+
+## 测试
+
+```bash
+mvn --batch-mode test
+```
+
+测试覆盖数据意图规则回退、公开 API 鉴权，以及 DataAgent 内部密钥和问题导向答案契约。
+
+## Docker
+
+完整项目在仓库根目录统一启动：
+
+```bash
+cp .env.example .env
 docker compose up -d --build
-```
-
-查看状态：
-
-```bash
 docker compose ps
 ```
 
-查看日志：
-
-```bash
-docker compose logs -f mindagent-java
-```
-
-停止：
-
-```bash
-docker compose down
-```
-
-Compose 服务和端口：
-
-| 服务 | 容器名 | 地址 |
-|------|--------|------|
-| Java App | `mindagent-java-app` | `http://localhost:8080` |
-| Nginx | `mindagent-java-nginx` | `http://localhost:8081` |
-| Prometheus | `mindagent-java-prometheus` | `http://localhost:9091` |
-| ChromaDB | `mindagent-java-chromadb` | `http://localhost:8002` |
-| Redis | `mindagent-java-redis` | `localhost:6380` |
-
-常用验证：
-
-```bash
-curl http://localhost:8080/health
-curl http://localhost:8081/health
-curl http://localhost:8080/metrics
-```
-
-Swagger：
-
-```text
-http://localhost:8080/docs
-http://localhost:8081/docs
-```
-
-## API 示例
-
-### 对话
-
-```bash
-curl -X POST http://localhost:8080/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "我想申请退款，订单号是 #12345",
-    "user_id": "u1001"
-  }'
-```
-
-也可以打开 Swagger UI，通过页面直接调用：
-
-```text
-http://localhost:8080/docs
-```
-
-### 检索
-
-```bash
-curl -X POST "http://localhost:8080/search?query=退款多久能到账&topK=3"
-```
-
-### 添加知识库
-
-```bash
-curl -X POST http://localhost:8080/knowledge/add \
-  -H "Content-Type: application/json" \
-  -d '{
-    "documents": [
-      {
-        "title": "退款补充政策",
-        "content": "大促期间退款审核时间可能延长到 3-5 个工作日。"
-      }
-    ]
-  }'
-```
-
-### 上传知识库文件
-
-```bash
-curl -X POST http://localhost:8080/knowledge/upload \
-  -F "file=@docs.md"
-```
-
-### 运行评测
-
-```bash
-curl -X POST http://localhost:8080/eval/run \
-  -H "Content-Type: application/json" \
-  -d '{}'
-```
+完整部署说明见仓库根目录的 `docs/InsightFlow国内服务器上线指南.md`。

@@ -13,6 +13,7 @@ class PipelineConfig:
     db_path: str | Path = "runtime_data/trade_demo.db"
     sample_size: int = 5
     allow_mock: bool = True
+    max_repair_attempts: int = 2
 
 
 @dataclass
@@ -25,6 +26,7 @@ class StepExecutionLog:
     sql: str
     execution_request: Dict[str, str]
     execution_result: Dict[str, Any]
+    attempts: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -36,13 +38,12 @@ class PipelineResult:
     schema_context: str
     cot_output: str
     step_logs: List[StepExecutionLog] = field(default_factory=list)
+    answer: str = ""
+    verification: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典。"""
-        success = bool(self.step_logs) and all(
-            log.execution_result.get("success") is True
-            for log in self.step_logs
-        )
+        success = self.verification.get("verified") is True
         errors = [
             str(log.execution_result.get("error"))
             for log in self.step_logs
@@ -55,12 +56,16 @@ class PipelineResult:
             "keywords": self.keywords,
             "schema_context": self.schema_context,
             "cot_output": self.cot_output,
+            "answer": self.answer,
+            "verified": success,
+            "verification": self.verification,
             "step_logs": [
                 {
                     "database": log.database,
                     "sql": log.sql,
                     "execution_request": log.execution_request,
                     "execution_result": log.execution_result,
+                    "attempts": log.attempts,
                 }
                 for log in self.step_logs
             ],
