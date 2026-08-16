@@ -22,7 +22,7 @@ services:
 
   dataagent:
     build:
-      context: ./dataagent/code/dataagent_agent/dataagent_agent
+      context: ./dataagent
     restart: unless-stopped
     init: true
     read_only: true
@@ -51,7 +51,7 @@ services:
 
   mindagent:
     build:
-      context: ./mindagent/MindAgentJava/MindAgentJava
+      context: ./mindagent
     restart: unless-stopped
     init: true
     read_only: true
