@@ -21,13 +21,12 @@ import {
 const REPOSITORY = "https://github.com/hachiwar/InsightFlow";
 const STAGES = ["关键词识别", "Schema 召回", "查询规划", "SQL 生成", "只读执行", "结果解释"];
 const NAV_ITEMS = [
-  ["overview", "项目总览", "01"],
-  ["architecture", "系统架构", "02"],
-  ["orchestration", "Agent 编排", "03"],
-  ["data-lab", "数据链路", "04"],
-  ["security", "安全治理", "05"],
-  ["deployment", "部署运行", "06"],
-  ["resume", "简历要点", "07"],
+  ["overview", "总览"],
+  ["architecture", "系统架构"],
+  ["orchestration", "Agent 编排"],
+  ["data-lab", "数据实验室"],
+  ["security", "安全治理"],
+  ["deployment", "部署运行"],
 ];
 const ROUTE_SCENARIOS = [
   { id: "general", label: "知识问答", question: "公司的退款政策和到账时间是什么？", intent: "GENERAL", target: "GeneralAgent", steps: ["读取会话记忆", "改写问题并检索知识库", "生成有依据的回答", "校验回答并写回记忆"] },
@@ -38,31 +37,30 @@ const ROUTE_SCENARIOS = [
 const sleep = (duration) => new Promise((resolve) => setTimeout(resolve, duration));
 let didAutoRun = false;
 
-function SectionHeading({ index, title, description }) {
-  return <header className="section-heading"><span>{index}</span><div><h2>{title}</h2>{description ? <p>{description}</p> : null}</div></header>;
+function SectionHeading({ title, description }) {
+  return <header className="section-heading"><h2>{title}</h2>{description ? <p>{description}</p> : null}</header>;
 }
 
 function Sidebar({ activeSection }) {
   return <aside className="sidebar">
-    <a className="brand" href="#overview" aria-label="InsightFlow 项目总览"><span className="brand-mark" aria-hidden="true">IF</span><span><strong>InsightFlow</strong><small>Agent Engineering</small></span></a>
-    <nav aria-label="页面导航">{NAV_ITEMS.map(([id, label, number]) => <a className={activeSection === id ? "active" : ""} href={`#${id}`} key={id}><span>{number}</span>{label}</a>)}</nav>
-    <div className="sidebar-meta"><span>Java · Python · React</span><a href={REPOSITORY} target="_blank" rel="noreferrer">GitHub 源码 ↗</a></div>
+    <a className="brand" href="#overview" aria-label="InsightFlow 项目总览"><span className="brand-mark" aria-hidden="true">IF</span><strong>InsightFlow</strong></a>
+    <nav aria-label="页面导航">{NAV_ITEMS.map(([id, label]) => <a className={activeSection === id ? "active" : ""} href={`#${id}`} key={id}>{label}</a>)}</nav>
+    <div className="sidebar-meta"><a href={REPOSITORY} target="_blank" rel="noreferrer">GitHub 仓库 ↗</a><span>Java · Python · React</span></div>
   </aside>;
 }
 
 function Overview() {
   return <section className="page-section overview" id="overview">
-    <div className="eyebrow"><span>Enterprise Agent System</span><span>2026</span></div>
-    <div className="overview-grid"><div><h1>企业知识与<br />数据问答 Agent</h1><p>InsightFlow 将对话编排与数据推理连接为一条可运行链路：MindAgent 理解上下文并选择专业 Agent，DataAgent 将业务问题转换为经过治理、执行和校验的 SQL。</p><div className="hero-actions"><a className="primary-button" href="#data-lab">在线体验</a><a className="text-link" href={REPOSITORY} target="_blank" rel="noreferrer">查看源码 ↗</a></div></div>
-      <div className="system-index" aria-label="系统组成"><article><span>01</span><div><strong>MindAgent</strong><p>会话记忆、企业知识 RAG、意图识别与 Agent 编排。</p></div></article><article><span>02</span><div><strong>DataAgent</strong><p>Schema 检索、查询规划、SQL 生成、治理执行与结果解释。</p></div></article><article><span>03</span><div><strong>Runtime</strong><p>Caddy、Redis、Docker Compose、健康检查与冒烟测试。</p></div></article></div>
-    </div>
-    <div className="principle-strip"><span>一个业务入口</span><span>两类推理职责</span><span>全链路可追踪</span><span>数据库只读边界</span></div>
+    <header className="overview-intro"><h1>InsightFlow</h1><p>让企业知识问答与数据分析共用一个可信的 Agent 入口。</p><div className="hero-actions"><a className="primary-button" href="#data-lab">进入数据实验室</a><a className="text-link" href={REPOSITORY} target="_blank" rel="noreferrer">查看 GitHub ↗</a></div></header>
+    <div className="overview-trace" aria-label="开放架构链路"><span>用户问题</span><b>→</b><span>MindAgent</span><b>→</b><span>意图路由</span><b>→</b><span>DataAgent</span><b>→</b><span>SQL 治理</span><b>→</b><span>结果解释</span></div>
+    <div className="boundary-table"><div className="boundary-head"><span>项目边界与职责</span><strong>MindAgent · 对话编排</strong><strong>DataAgent · 数据查询</strong></div><div><span>核心职责</span><p>对话理解、上下文管理、知识检索、意图识别与路由。</p><p>Schema 召回、查询规划、SQL 生成、治理执行与解释。</p></div><div><span>输入</span><p>自然语言问题、历史对话、系统指令与工具状态。</p><p>结构化意图、业务约束、用户权限与数据库元数据。</p></div><div><span>输出</span><p>统一、可追踪的 Agent 响应与后续动作。</p><p>受治理的 SQL、结果集、校验状态与问题导向解释。</p></div><div><span>不负责</span><p>直接访问业务数据库或绕过数据安全策略。</p><p>维护会话记忆或编排跨领域 Agent。</p></div></div>
+    <div className="evidence-strip"><span><b>浏览器内 SQLite</b>真实执行样例查询</span><span><b>只读 SQL</b>执行前策略校验</span><span><b>问题导向解释</b>对照问题与结果</span><span><b>Docker Compose</b>完整服务运行</span></div>
   </section>;
 }
 
 function Architecture() {
   return <section className="page-section" id="architecture">
-    <SectionHeading index="02" title="系统架构" description="对话层负责理解与路由，数据层负责查询推理；两者通过稳定的 HTTP 契约协作。" />
+    <SectionHeading title="系统架构" description="对话层负责理解与路由，数据层负责查询推理；两者通过稳定的 HTTP 契约协作。" />
     <div className="architecture-flow"><article className="flow-entry"><span>ENTRY</span><strong>用户 / 业务系统</strong><p>POST /chat</p></article><b aria-hidden="true">→</b><article><span>GATEWAY</span><strong>Caddy</strong><p>HTTPS · API Key</p></article><b aria-hidden="true">→</b><article className="flow-primary"><span>ORCHESTRATOR</span><strong>MindAgent</strong><p>Memory · RAG · Router</p></article><b aria-hidden="true">→</b><article><span>DATA TOOL</span><strong>DataAgent</strong><p>Text2SQL · Audit</p></article></div>
     <div className="architecture-details"><article><span>对话上下文</span><h3>工作记忆 + 情节记忆</h3><p>Redis 保存近期消息与 TTL，历史摘要按当前问题检索；回答完成后更新会话与用户画像。</p></article><article><span>知识检索</span><h3>改写 + 并行召回 + Rerank</h3><p>查询改写后并行调用知识工具，通过缓存、超时和熔断控制外部依赖。</p></article><article><span>结构化数据</span><h3>SchemaGraph + CoT 规划</h3><p>从字段级元数据构建局部 Schema，生成数据库、输入、输出与依赖明确的查询步骤。</p></article></div>
   </section>;
@@ -72,7 +70,7 @@ function Orchestration() {
   const [scenarioId, setScenarioId] = useState("data");
   const scenario = ROUTE_SCENARIOS.find((item) => item.id === scenarioId);
   return <section className="page-section" id="orchestration">
-    <SectionHeading index="03" title="Agent 编排" description="同一个入口根据意图、上下文与服务状态选择执行链，数据问题会跨服务进入 DataAgent。" />
+    <SectionHeading title="Agent 编排" description="同一个入口根据意图、上下文与服务状态选择执行链，数据问题会跨服务进入 DataAgent。" />
     <div className="scenario-tabs" role="tablist" aria-label="业务场景">{ROUTE_SCENARIOS.map((item) => <button type="button" role="tab" aria-selected={item.id === scenarioId} className={item.id === scenarioId ? "active" : ""} onClick={() => setScenarioId(item.id)} key={item.id}>{item.label}</button>)}</div>
     <div className="route-board"><div className="route-input"><span>INPUT / POST /chat</span><blockquote>{scenario.question}</blockquote><dl><div><dt>意图</dt><dd>{scenario.intent}</dd></div><div><dt>目标</dt><dd>{scenario.target}</dd></div></dl></div><ol>{scenario.steps.map((step, index) => <li key={step}><span>{String(index + 1).padStart(2, "0")}</span><p>{step}</p></li>)}</ol></div>
   </section>;
@@ -172,7 +170,7 @@ function DataLab() {
   }
 
   return <section className="page-section data-lab" id="data-lab">
-    <SectionHeading index="04" title="从业务问题到可审计 SQL" description="样例数据库在浏览器内真实执行。你也可以临时接入 OpenAI Chat Completions 兼容模型，观察动态生成与错误修复。" />
+    <SectionHeading title="数据实验室" description="样例数据库在浏览器内执行；问题、规划、SQL、结果和解释都可检查。你也可以临时接入 OpenAI Chat Completions 兼容模型。" />
     <div className="stage-line" aria-label="执行阶段">{STAGES.map((stage, index) => { const number = index + 1; const state = number < activeStage ? "done" : number === activeStage ? "active" : ""; return <div className={state} key={stage}><span>{number < activeStage ? "✓" : number}</span><small>{stage}</small></div>; })}</div>
     {error ? <div className="error-banner" role="alert"><strong>本次分析未完成</strong><span>{error}</span></div> : null}
     <div className="lab-grid">
@@ -187,18 +185,14 @@ function DataLab() {
 }
 
 function Security() {
-  return <section className="page-section" id="security"><SectionHeading index="05" title="安全治理" description="把模型输出视为不可信输入；校验、数据库权限和审计在执行层统一生效。" /><div className="security-grid"><article><span>01 / INPUT</span><h3>入口与密钥隔离</h3><p>公开 API 与内部服务使用不同密钥；模型 Key 只存于当前浏览器内存，不写入仓库和样例数据库。</p></article><article><span>02 / POLICY</span><h3>SQL 只读策略</h3><p>仅接受单条 SELECT / WITH，拦截写入、DDL、管理指令、危险函数和未授权数据表。</p></article><article><span>03 / DATABASE</span><h3>数据库双重限制</h3><p>SQLite 使用只读连接与 query_only，设置执行超时、最大返回行数和表白名单。</p></article><article><span>04 / EVIDENCE</span><h3>校验与审计</h3><p>核对执行状态、行列一致性与数值有效性，记录 SQL 指纹、耗时、策略结果和错误信息。</p></article></div><div className="blocked-example"><code>DELETE FROM account_balance WHERE user_id = ?;</code><strong>BLOCKED</strong><span>在数据库执行前被 SQL 治理层拒绝</span></div></section>;
+  return <section className="page-section" id="security"><SectionHeading title="安全治理" description="把模型输出视为不可信输入；校验、数据库权限和审计在执行层统一生效。" /><div className="security-grid"><article><span>输入边界</span><h3>解析与单语句</h3><p>拒绝多语句拼接、注释注入与不完整语法，模型输出必须先经过解析。</p></article><article><span>执行策略</span><h3>只读白名单</h3><p>仅接受单条 SELECT / WITH，拦截 INSERT、UPDATE、DELETE、DDL 与管理指令。</p></article><article><span>数据边界</span><h3>表与函数边界</h3><p>仅允许当前 Schema 中的授权对象，并拒绝文件、扩展和高风险函数。</p></article><article><span>证据留存</span><h3>结果与审计</h3><p>核对行列与数值一致性，记录 SQL 指纹、耗时、策略结果和错误信息。</p></article></div><div className="blocked-example"><code>DROP TABLE accounts;</code><strong>已拒绝</strong><span>在数据库执行前被 SQL 治理层拦截</span></div></section>;
 }
 
 function Deployment() {
-  return <section className="page-section" id="deployment"><SectionHeading index="06" title="部署运行" description="GitHub Pages 承载可交互范例站；完整服务通过 Docker Compose 部署到支持 Docker 的 Linux 主机。" /><div className="deploy-layout"><ol><li><span>01</span><div><strong>准备配置</strong><p>复制 .env.example，设置域名、入口密钥、内部密钥与模型配置。</p></div></li><li><span>02</span><div><strong>启动服务</strong><p>Compose 构建 MindAgent、DataAgent、Redis 与 Caddy，内部服务不直接暴露端口。</p></div></li><li><span>03</span><div><strong>验证链路</strong><p>检查健康状态，再用带鉴权的 /chat 请求验证 MindAgent → DataAgent 调用。</p></div></li></ol><pre><code>{`cp .env.example .env
+  return <section className="page-section" id="deployment"><SectionHeading title="部署运行" description="GitHub Pages 承载可交互范例站；完整服务通过 Docker Compose 部署到支持 Docker 的 Linux 主机。" /><div className="deploy-layout"><ol><li><span>01</span><div><strong>准备配置</strong><p>复制 .env.example，设置域名、入口密钥、内部密钥与模型配置。</p></div></li><li><span>02</span><div><strong>启动服务</strong><p>Compose 构建 MindAgent、DataAgent、Redis 与 Caddy，内部服务不直接暴露端口。</p></div></li><li><span>03</span><div><strong>验证链路</strong><p>检查健康状态，再用带鉴权的 /chat 请求验证 MindAgent → DataAgent 调用。</p></div></li></ol><pre><code>{`cp .env.example .env
 docker compose up -d --build
 docker compose ps
 ./deploy/smoke-test.sh`}</code></pre></div><a className="document-link" href={`${REPOSITORY}/blob/main/docs/InsightFlow国内服务器上线指南.md`} target="_blank" rel="noreferrer">阅读国内服务器上线指南 <span>↗</span></a></section>;
-}
-
-function Resume() {
-  return <section className="page-section resume" id="resume"><SectionHeading index="07" title="简历要点" description="面试时从业务问题、系统边界和关键取舍出发，现场用数据实验室证明链路。" /><div className="resume-grid"><div><span>PROJECT SUMMARY</span><h3>InsightFlow<br />企业知识与数据问答 Agent</h3><p>Java 21 · Spring Boot · Spring AI · Python · SQLite · Redis · React · Docker</p></div><ul><li>设计 MindAgent / DataAgent 分层架构，以统一对话入口编排知识问答、技术支持、账单账户与数据查询。</li><li>实现字段级 Schema 混合检索、SchemaGraph、CoT 查询规划、局部 Schema SQL 生成及有限自动纠错。</li><li>在执行层实现只读语句校验、表白名单、危险函数拦截、结果一致性校验与查询审计。</li><li>使用 Docker Compose、Caddy、Redis、健康检查和冒烟测试交付完整服务，并以 GitHub Pages 提供可运行范例。</li></ul></div><div className="resume-footer"><span>建议演示顺序</span><strong>架构 2 分钟 → 数据链路 4 分钟 → 安全与部署 2 分钟</strong><a href={REPOSITORY} target="_blank" rel="noreferrer">打开仓库 ↗</a></div></section>;
 }
 
 export default function App() {
@@ -209,5 +203,5 @@ export default function App() {
     sections.forEach((section) => observer.observe(section));
     return () => observer.disconnect();
   }, []);
-  return <div className="app-shell"><a className="skip-link" href="#main">跳到主要内容</a><Sidebar activeSection={activeSection} /><main id="main"><Overview /><Architecture /><Orchestration /><DataLab /><Security /><Deployment /><Resume /><footer>InsightFlow · 公开样例数据仅用于工程演示，不连接真实企业或银行数据库。</footer></main></div>;
+  return <div className="app-shell"><a className="skip-link" href="#main">跳到主要内容</a><Sidebar activeSection={activeSection} /><main id="main"><Overview /><Architecture /><Orchestration /><DataLab /><Security /><Deployment /><footer>InsightFlow · 公开样例数据仅用于工程演示，不连接真实企业或银行数据库。</footer></main></div>;
 }
