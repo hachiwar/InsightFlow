@@ -34,12 +34,14 @@ EchoMind /chat
 
 ## 在线范例站
 
-仓库包含可发布到 GitHub Pages 的纯前端范例站。它在浏览器内运行 SQLite 样例数据库，并逐步展示关键词识别、Schema 召回、查询规划、SQL 生成、只读检查、执行结果和结果解释。
+仓库包含可发布到 GitHub Pages 的完整项目展示站。页面通过交互式路由演示说明 EchoMind 的统一 `/chat` 入口、会话记忆、知识库 RAG、意图识别、General/Technical/Billing/Data 四类 Agent、失败降级与监控评测，并展示 EchoMind、AskData、Redis、Caddy 的部署边界。数据实验室会在浏览器内真实运行 SQLite，逐步展示关键词识别、Schema 召回、查询规划、SQL 生成、只读检查、执行结果和结果解释。
 
 范例站提供以下两种模式：
 
 - 本地演示模式：不需要 API Key，支持 3 个经过测试的复杂多表场景；
 - 自定义模型模式：内置 DeepSeek、通义千问和智谱 GLM 预设，也可填写任意 OpenAI 兼容 Chat Completions 端点。模型先根据问题和 Schema 生成 SQLite SQL；执行错误时根据最新 SQLite 反馈最多自动纠错 2 次；执行成功后再根据实际结果生成业务解释，解释请求失败时回退到本地总结。
+
+GitHub Pages 只能执行前端 JavaScript 和 WebAssembly。页面对完整后端流程进行如实的架构展示，但不会在静态站点内启动 EchoMind Java、AskData Python、Redis、Caddy 或 Docker。完整后端必须按服务器上线指南部署。
 
 上线步骤见 [GitHub Pages 范例站上线指南](docs/InsightFlow-GitHub-Pages范例站上线指南.md)。在本地预览：
 

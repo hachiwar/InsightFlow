@@ -2,7 +2,7 @@
 
 本文面向第一次发布网站的开发者，说明如何把仓库中的 `demo-site` 发布为公开范例站。该方案不需要购买服务器，适合项目展示、面试演示和前端功能验证。
 
-文档核对日期：2026 年 8 月 14 日。
+文档核对日期：2026 年 8 月 16 日。
 
 ## 1. 先理解上线后的结构
 
@@ -15,9 +15,21 @@ GitHub Pages 只托管构建后的 HTML、CSS、JavaScript 和 WebAssembly 静�
   └── 可选模型端点：使用访问者临时填写的 API Key 生成 SQL
 ```
 
-这与根目录 `compose.yaml` 的完整后端部署不同。GitHub Pages 范例站用于展示 Text2SQL Agent 链路；Docker Compose 部署用于运行 EchoMind、AskData、Redis 和 Caddy 服务。
+这与根目录 `compose.yaml` 的完整后端部署不同。GitHub Pages 展示完整项目架构，并在浏览器内真实运行 Text2SQL 样例；Docker Compose 部署用于实际运行 EchoMind、AskData、Redis 和 Caddy 服务。
 
 ## 2. 当前范例包含什么
+
+项目总览展示以下仓库主流程：
+
+- EchoMind 统一 `/chat` 入口、API 鉴权和会话上下文；
+- 知识问答、技术支持、账单账户和数据分析四类意图路由；
+- 工作记忆、情节记忆、用户画像、知识库 RAG 和回答校验；
+- DataAgent → AskData 的跨服务数据查询链路；
+- EchoMind、AskData 和部署层的职责边界；
+- 熔断、Agent 降级、监控、评测、只读执行和容器隔离；
+- Caddy、EchoMind、AskData、Redis 的生产部署拓扑。
+
+上述 Java、Python 和容器能力属于交互式架构展示，不会在 GitHub Pages 内启动。数据实验室真实包含：
 
 - 5 张有关联关系的样例表：客户、银行账户、订单、订单成本和月度目标；
 - 3 个多表复杂场景：地区连续亏损诊断、有存款但长期未消费客户识别、收入增长但利润下滑归因；
@@ -32,7 +44,7 @@ GitHub Pages 只托管构建后的 HTML、CSS、JavaScript 和 WebAssembly 静�
 
 GitHub Pages 工作流只在 `main` 分支发布。先打开仓库中的 Draft PR，确认 CI 通过，然后将其合并到 `main`：
 
-1. 打开 [InsightFlow Pull Request #1](https://github.com/hachiwar/InsightFlow/pull/1)。
+1. 打开当前待合并的 InsightFlow Pull Request。
 2. 确认 `verify` 检查为绿色。
 3. 将 Draft PR 转为可审查状态。
 4. 单击 `Merge pull request`。
@@ -70,7 +82,10 @@ https://hachiwar.github.io/InsightFlow/
 
 打开公开地址后，按以下顺序检查：
 
-- [ ] 页面顶部显示“本地演示模式”和“样例数据仅在浏览器内”；
+- [ ] 项目总览明确说明“真实运行”“可选运行”和“架构展示”的边界；
+- [ ] 统一入口可以切换知识问答、技术支持、账单账户和数据分析四类路由；
+- [ ] 页面展示 EchoMind、AskData、部署三层职责，以及记忆、RAG、安全和上线流程；
+- [ ] 数据实验室显示“本地演示模式”和“样例数据仅在浏览器内”；
 - [ ] 样例数据库显示 5 张表及其字段；
 - [ ] 默认问题自动完成 6 个阶段；
 - [ ] 生成 SQL 只包含 `SELECT` 或 `WITH` 查询；
