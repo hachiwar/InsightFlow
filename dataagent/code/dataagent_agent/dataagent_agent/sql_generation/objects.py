@@ -9,7 +9,7 @@ class CotStep:
     """
     CoT 四元组中的单个步骤。
 
-    数据库只用于后续执行路由；
+    数据库只用于执行路由；
     SQL 生成 Prompt 中只放处理对象、操作指令和输出目标。
     """
 
@@ -124,7 +124,7 @@ class SqlGenerationResult:
         """
         转换为数据库执行请求。
 
-        后续可以通过 MCP 路由到对应 database 的执行 API。
+        返回对象由 MCPRouter 路由到对应 database 的执行器。
         """
         return {
             "database": self.database,

@@ -1,10 +1,33 @@
 # InsightFlow：企业知识与数据问答 Agent
 
+[![CI](https://github.com/hachiwar/InsightFlow/actions/workflows/ci.yml/badge.svg)](https://github.com/hachiwar/InsightFlow/actions/workflows/ci.yml)
+[![GitHub Pages](https://github.com/hachiwar/InsightFlow/actions/workflows/pages.yml/badge.svg)](https://github.com/hachiwar/InsightFlow/actions/workflows/pages.yml)
+
 [在线演示](https://hachiwar.github.io/InsightFlow/) · [架构设计](docs/architecture.md) · [国内服务器上线指南](docs/InsightFlow国内服务器上线指南.md)
 
-InsightFlow 是一套可运行的企业 Agent 工程：MindAgent 负责会话记忆、知识库 RAG、意图识别和多 Agent 编排；DataAgent 负责把自然语言数据问题转换为经过治理、执行、校验和解释的 SQL。项目提供 Java / Python 后端、浏览器内 SQLite 范例、Docker Compose 部署以及自动化测试。
+InsightFlow 是一套面向企业知识问答与结构化数据分析的 Agent 工程。MindAgent 负责会话记忆、知识库 RAG、意图识别和多 Agent 编排；DataAgent 负责把自然语言数据问题转换为经过治理、执行、校验和解释的 SQL。仓库包含 Java 与 Python 后端、浏览器内 SQLite 交互范例、Docker Compose 部署、接口文档和自动化测试。
 
-## 为什么不是预存 SQL
+## 核心能力
+
+| 领域 | 能力 |
+|---|---|
+| 统一入口 | MindAgent 对外提供 `/chat`，在知识问答、技术支持、账单账户和数据查询之间完成意图路由 |
+| 对话与知识 | Redis 工作记忆、历史摘要、用户画像、查询改写、BM25 与向量混合检索、Rerank |
+| 数据推理 | 字段级 Schema 召回、SchemaGraph、CoT 四元组规划、局部 Schema SQL 生成和有限纠错 |
+| 执行治理 | 单语句与只读校验、危险函数拦截、表白名单、查询超时、结果上限和 SQLite 只读连接 |
+| 结果证据 | 问题导向解释、行列一致性校验、SQL 指纹、策略结果、执行耗时和错误审计 |
+| 工程交付 | Caddy、Docker Compose、双 API Key、内部网络、健康检查、冒烟测试和 GitHub Actions |
+
+## 技术栈
+
+| 层级 | 技术 |
+|---|---|
+| MindAgent | Java 21、Spring Boot、Spring AI、Redis、Micrometer、OpenAPI |
+| DataAgent | Python、SQLite、HTTP API、Schema 检索、Text-to-SQL、SQL 治理 |
+| 在线范例 | React、Vite、sql.js、WebAssembly |
+| 部署与质量 | Caddy、Docker Compose、GitHub Actions、Java/Python/Node.js 自动化测试 |
+
+## 动态数据问答场景
 
 报表脚本适合固定口径；业务问答经常同时包含动态时间、模糊概念、多表关系和追问上下文。例如：
 
@@ -57,7 +80,7 @@ DataAgent（Python）
 
 [GitHub Pages 范例站](https://hachiwar.github.io/InsightFlow/) 使用 React、sql.js 和 WebAssembly 在浏览器内真实执行 5 张样例表，展示完整数据链路。内置 3 个复杂多表场景，无需 API Key。
 
-页面也支持临时填写 OpenAI Chat Completions 兼容端点。启用后，模型负责动态 SQL、错误修复和结果解释；执行仍由浏览器只读沙盒完成。API Key 只保存在当前页面内存，刷新即清除。问题、相关 Schema、SQL 和结果会发送到用户填写的模型端点，因此只应使用临时限额 Key和公开样例数据。
+页面也支持临时填写 OpenAI Chat Completions 兼容端点。启用后，模型负责动态 SQL、错误修复和结果解释；执行仍由浏览器只读沙盒完成。API Key 只保存在当前页面内存，刷新即清除。问题、相关 Schema、SQL 和结果会发送到用户填写的模型端点，因此只应使用临时限额 Key 和公开样例数据。
 
 本地运行：
 
@@ -178,7 +201,7 @@ MindAgent 优先使用 `answer` 组织对话回复，同时保留 SQL 和校验�
 - 容器使用只读文件系统、非特权模式和内部网络；
 - 返回行数、请求体和执行时间均有限制；
 - 审计记录不保存明文 SQL，只保存指纹、策略、耗时和错误；
-- `.env`、数据库、日志、PDF 和本地面试材料均被 Git 忽略。
+- `.env`、数据库、运行日志、PDF 和本地个人文档均被 Git 忽略。
 
 项目的工程范围是只读企业问答与 SQLite 演示数据，不提供数据库写操作，也不连接真实银行账户。接入企业数据时，应为每个数据源配置专用只读账号与最小化表白名单。
 
@@ -218,7 +241,7 @@ InsightFlow/
 └── .env.example     # 无密钥配置模板
 ```
 
-## 项目验证路径
+## 复现与检查
 
 1. 查看 MindAgent / DataAgent 的职责边界；
 2. 在在线站点运行“盈利下降”或“存款未消费”场景，逐步查看关键词、Schema、计划、SQL、结果和解释；

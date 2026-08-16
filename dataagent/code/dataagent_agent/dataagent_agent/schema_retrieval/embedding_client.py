@@ -120,7 +120,7 @@ class AliyunEmbeddingClient:
 
         vectors = np.array(embeddings, dtype=np.float32)
 
-        # 归一化，后续可以直接用点积计算 cosine similarity。
+        # 归一化后可直接用点积计算 cosine similarity。
         norms = np.linalg.norm(vectors, axis=1, keepdims=True)
         vectors = vectors / np.maximum(norms, 1e-8)
 

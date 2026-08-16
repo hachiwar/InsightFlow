@@ -11,12 +11,8 @@ class LocalSchemaStore:
     """
     本地 Schema 存储。
 
-    这里先用内存对象保存完整 Schema。
-    后续可以替换为：
-    - Milvus 字段索引
-    - Milvus 表关系索引
-    - SchemaGraph 对象
-    - 元数据服务 API
+    使用内存对象保存当前查询的完整 Schema，并支持从 SchemaGraph 构建。
+    上游元数据可以来自 Milvus 字段索引、表关系索引或元数据服务 API。
 
     SQL 生成阶段不会直接使用完整 Schema，而是根据 CoT 四元组中的处理对象
     裁剪出当前步骤需要的局部 Schema。
@@ -90,9 +86,8 @@ class LocalSchemaStore:
         从 SchemaGraph 构建 SchemaStore。
 
         SchemaGraph 来自 Schema 检索阶段。
-        SQL 生成阶段会先把这个 SchemaGraph 存下来，
-        后续根据 CoT 四元组中的处理对象、操作指令和输出目标，
-        再从中裁剪当前步骤需要的局部 Schema。
+        SQL 生成阶段保存 SchemaGraph，并根据 CoT 四元组中的处理对象、
+        操作指令和输出目标裁剪当前步骤需要的局部 Schema。
         """
         tables: Dict[str, TableSchema] = {}
 

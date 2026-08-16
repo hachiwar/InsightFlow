@@ -136,8 +136,7 @@ def get_trade_relations_meta() -> list[dict]:
     """
     Demo 表关系元数据。
 
-    当前 SQLite 可以通过外键提取出关系。
-    这里保留结构，后续可以写入 Milvus 的表关系 Collection。
+    SQLite 通过外键提取关系；同一结构也可作为 Milvus 表关系 Collection 的写入对象。
     """
     return [
         {

@@ -318,7 +318,7 @@ def test_schema_loading_and_retrieval() -> bool:
             print("\n✅ 最小字段检索流程正常")
             return True
 
-        print("\n⚠️ 检索流程跑通，但没有命中预期字段。可以后续优化分词和元数据。")
+        print("\n⚠️ 检索流程可用，但本次查询未命中预期字段；请检查分词与元数据配置。")
         return True
 
     except Exception as exc:
@@ -339,7 +339,7 @@ def test_sentence_transformers_import(deps: dict) -> bool:
 
         print("✅ sentence-transformers 可以 import")
         print("说明：这里不强制下载模型，避免无网络环境卡住。")
-        print("后续你可以手动测试：")
+        print("如需验证模型下载，可运行：")
         print('python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer(\'BAAI/bge-small-zh-v1.5\')"')
         return True
 
