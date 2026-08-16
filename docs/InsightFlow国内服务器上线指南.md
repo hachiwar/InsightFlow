@@ -30,9 +30,9 @@ git clone --branch agent/add-project-documentation --single-branch https://githu
 |---|---|---|
 | 腾讯云或阿里云账号 | 必须 | 购买和管理 Linux 服务器 |
 | 4 核 8 GB Linux 服务器 | 推荐 | 构建并运行 Java、Python、Redis 和 Caddy |
-| DeepSeek 或 Anthropic API Key | 必须 | EchoMind 意图识别和对话 |
-| DashScope API Key | 正式数据问答必须 | AskData 查询规划和 SQL 生成 |
-| 3 个随机密钥 | 必须 | 公开 API、内部 AskData 和 Redis 鉴权 |
+| DeepSeek 或 Anthropic API Key | 必须 | MindAgent 意图识别和对话 |
+| DashScope API Key | 正式数据问答必须 | DataAgent 查询规划和 SQL 生成 |
+| 3 个随机密钥 | 必须 | 公开 API、内部 DataAgent 和 Redis 鉴权 |
 | 域名 | 可选 | 通过 HTTPS 和固定地址访问 |
 | ICP 备案 | 中国大陆服务器域名接入时必须 | 中国大陆服务器上的公开网站接入 |
 
@@ -55,14 +55,14 @@ git clone --branch agent/add-project-documentation --single-branch https://githu
 
 如果只需要首次技术验证，完成第 8 步即可。在此之前不需要购买域名。
 
-### 0.4 选择 AskData 运行模式
+### 0.4 选择 DataAgent 运行模式
 
-| 模式 | `DASHSCOPE_API_KEY` | `ASKDATA_ALLOW_MOCK` | 适用场景 |
+| 模式 | `DASHSCOPE_API_KEY` | `DATAAGENT_ALLOW_MOCK` | 适用场景 |
 |---|---|---|---|
 | 真实模型调用 | 填写有效密钥 | `false` | 公开演示，当前仍仅使用 SQLite 演示数据 |
 | 内置演示 | 可为空 | `true` | 仅验证文档中的交易笔数与利率问题 |
 
-内置演示模式不是通用 Text2SQL。公开分享服务前，必须配置真实 DashScope API Key，将 `ASKDATA_ALLOW_MOCK` 恢复为 `false`，并重建服务。
+内置演示模式不是通用 Text2SQL。公开分享服务前，必须配置真实 DashScope API Key，将 `DATAAGENT_ALLOW_MOCK` 恢复为 `false`，并重建服务。
 
 ## 1. 阅读前说明
 
@@ -73,14 +73,14 @@ InsightFlow 由多个服务组成，不能只上传一个 JAR 文件完成部署
     ↓ HTTP/HTTPS
 Caddy
     ↓
-EchoMind Java 服务
+MindAgent Java 服务
     ├── Redis：会话记忆
-    └── AskData Python 服务
+    └── DataAgent Python 服务
             ↓
         SQLite 演示数据库
 ```
 
-部署时只应公开反向代理的 `80` 和 `443` 端口。EchoMind、AskData 和 Redis 应通过 Docker 内部网络通信。
+部署时只应公开反向代理的 `80` 和 `443` 端口。MindAgent、DataAgent 和 Redis 应通过 Docker 内部网络通信。
 
 ### 1.1 当前仓库状态
 
@@ -88,17 +88,17 @@ EchoMind Java 服务
 
 | 项目 | 状态 | 说明 |
 |---|---|---|
-| EchoMind Dockerfile | 已实现 | 位于 `echomind/EchoMindJava/EchoMindJava/Dockerfile` |
-| AskData HTTP 服务 | 已有 | 提供 `/health` 和 `/query` |
-| AskData Dockerfile | 已实现 | 使用最小运行依赖和非 root 用户 |
-| 根级 `compose.yaml` | 已实现 | 统一启动 Redis、AskData、EchoMind 和 Caddy |
+| MindAgent Dockerfile | 已实现 | 位于 `mindagent/MindAgentJava/MindAgentJava/Dockerfile` |
+| DataAgent HTTP 服务 | 已有 | 提供 `/health` 和 `/query` |
+| DataAgent Dockerfile | 已实现 | 使用最小运行依赖和非 root 用户 |
+| 根级 `compose.yaml` | 已实现 | 统一启动 Redis、DataAgent、MindAgent 和 Caddy |
 | 反向代理 | 已实现 | 仅 Caddy 向主机映射端口 |
 | HTTPS | 已配置 | 使用域名时由 Caddy 自动申请和续期证书 |
-| API 鉴权 | 已实现 | 公开 API 和 AskData 内部 API 使用不同密钥 |
+| API 鉴权 | 已实现 | 公开 API 和 DataAgent 内部 API 使用不同密钥 |
 
 ### 1.2 演示环境边界
 
-首次上线建议只使用仓库自带的 SQLite 演示数据。容器配置默认禁用 Mock；仅在受 API Key 保护的首次技术验证中，才可以临时将 `ASKDATA_ALLOW_MOCK` 设为 `true`。Mock 只接受文档中的演示查询，其他查询会失败关闭。
+首次上线建议只使用仓库自带的 SQLite 演示数据。容器配置默认禁用 Mock；仅在受 API Key 保护的首次技术验证中，才可以临时将 `DATAAGENT_ALLOW_MOCK` 设为 `true`。Mock 只接受文档中的演示查询，其他查询会失败关闭。
 
 ## 2. 选择部署区域
 
@@ -126,8 +126,8 @@ EchoMind Java 服务
 - 一个腾讯云或阿里云账号；
 - 一台 Linux 云服务器；
 - 可访问 `hachiwar/InsightFlow` 的 GitHub 网络环境；
-- DeepSeek 或 Anthropic API Key，用于 EchoMind；
-- DashScope API Key，用于 AskData 的规划、SQL 生成和可选检索服务；
+- DeepSeek 或 Anthropic API Key，用于 MindAgent；
+- DashScope API Key，用于 DataAgent 的规划、SQL 生成和可选检索服务；
 - 一个域名，可在基础服务验证成功后再购买。
 
 所有 API Key 和密码必须配置在服务器的 `.env` 文件中，不得提交到 GitHub、写入截图或发送到公开聊天记录。
@@ -172,8 +172,8 @@ Java Maven 构建、Python 服务和 Redis 同时运行时会占用一定内存�
 | 端口 | 服务 | 原因 |
 |---:|---|---|
 | `6379` | Redis | 数据和会话服务不应直接暴露公网 |
-| `8090` | AskData | 数据查询服务只允许 EchoMind 内部调用 |
-| `8080` | EchoMind | 应通过反向代理统一接入 |
+| `8090` | DataAgent | 数据查询服务只允许 MindAgent 内部调用 |
+| `8080` | MindAgent | 应通过反向代理统一接入 |
 | `9090` | Prometheus | 监控数据只允许管理员访问 |
 
 ## 6. 登录服务器并检查环境
@@ -250,15 +250,15 @@ openssl rand -hex 32
 openssl rand -hex 32
 ```
 
-将 3 行输出分别用于 `ECHOMIND_API_KEY`、`ASKDATA_API_KEY` 和 `REDIS_PASSWORD`。推荐使用 DeepSeek 作为 EchoMind 的初始模型配置：
+将 3 行输出分别用于 `MINDAGENT_API_KEY`、`DATAAGENT_API_KEY` 和 `REDIS_PASSWORD`。推荐使用 DeepSeek 作为 MindAgent 的初始模型配置：
 
 ```dotenv
 SITE_ADDRESS=:80
 HTTP_PORT=80
 HTTPS_PORT=443
 
-ECHOMIND_API_KEY=<第 1 个随机密钥>
-ASKDATA_API_KEY=<第 2 个随机密钥>
+MINDAGENT_API_KEY=<第 1 个随机密钥>
+DATAAGENT_API_KEY=<第 2 个随机密钥>
 REDIS_PASSWORD=<第 3 个随机密钥>
 
 SPRING_PROFILES_ACTIVE=deepseek
@@ -267,12 +267,12 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-v4-flash
 
 DASHSCOPE_API_KEY=<填写 DashScope API Key>
-ASKDATA_TIMEOUT_MS=30000
-ASKDATA_ALLOW_MOCK=false
+DATAAGENT_TIMEOUT_MS=30000
+DATAAGENT_ALLOW_MOCK=false
 LLM_FALLBACK_ENABLED=false
 ```
 
-如果尚未申请 DashScope API Key，进行首次技术验证时可以临时将 `ASKDATA_ALLOW_MOCK` 改为 `true`。此模式只支持本文的演示数据问题，不得将其宣传为真实数据问答能力。
+如果尚未申请 DashScope API Key，进行首次技术验证时可以临时将 `DATAAGENT_ALLOW_MOCK` 改为 `true`。此模式只支持本文的演示数据问题，不得将其宣传为真实数据问答能力。
 
 模型密钥申请和计费说明以官方页面为准：
 
@@ -332,8 +332,8 @@ docker compose ps
 
 ```text
 redis
-askdata
-echomind
+dataagent
+mindagent
 proxy
 ```
 
@@ -345,35 +345,35 @@ proxy
 
 ```bash
 docker compose logs --tail=100 redis
-docker compose logs --tail=100 askdata
-docker compose logs --tail=100 echomind
+docker compose logs --tail=100 dataagent
+docker compose logs --tail=100 mindagent
 docker compose logs --tail=100 proxy
 ```
 
 日志中不得出现以下信息：
 
 - Redis 身份验证失败；
-- AskData 无法监听端口；
-- EchoMind 无法连接 Redis；
-- EchoMind 无法连接 AskData；
+- DataAgent 无法监听端口；
+- MindAgent 无法连接 Redis；
+- MindAgent 无法连接 DataAgent；
 - Java JAR 不存在；
 - API Key 被打印到日志。
 
 ### 10.2 验证健康检查
 
-通过反向代理测试 EchoMind：
+通过反向代理测试 MindAgent：
 
 ```bash
 curl --fail --show-error http://127.0.0.1/health
 ```
 
-在 AskData 容器内测试其健康接口：
+在 DataAgent 容器内测试其健康接口：
 
 ```bash
-docker compose exec askdata python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8090/health').read().decode())"
+docker compose exec dataagent python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8090/health').read().decode())"
 ```
 
-预期 AskData 返回：
+预期 DataAgent 返回：
 
 ```json
 {"status":"ok"}
@@ -389,7 +389,7 @@ set +a
 curl --fail --show-error \
   --request POST \
   --header 'Content-Type: application/json; charset=utf-8' \
-  --header "X-API-Key: $ECHOMIND_API_KEY" \
+  --header "X-API-Key: $MINDAGENT_API_KEY" \
   --data '{"message":"查询总交易笔数大于 50000 的用户利率","user_id":"demo-user","conversation_id":"demo-conversation"}' \
   http://127.0.0.1/chat
 ```
@@ -397,7 +397,7 @@ curl --fail --show-error \
 也可以使用仓库内的冒烟测试脚本：
 
 ```bash
-python3 scripts/smoke_test.py --base-url http://127.0.0.1 --api-key "$ECHOMIND_API_KEY"
+python3 scripts/smoke_test.py --base-url http://127.0.0.1 --api-key "$MINDAGENT_API_KEY"
 ```
 
 验收时应检查：
@@ -407,7 +407,7 @@ python3 scripts/smoke_test.py --base-url http://127.0.0.1 --api-key "$ECHOMIND_A
 - 数据问题被路由到 DataAgent；
 - 响应包含 SQL 和查询结果；
 - 无关问题不会返回演示 SQL；
-- AskData 执行失败时，Java 不会把失败结果包装为成功。
+- DataAgent 执行失败时，Java 不会把失败结果包装为成功。
 
 ## 11. 配置域名和 HTTPS
 
@@ -467,10 +467,10 @@ curl --fail --show-error https://api.example.com/health
 
 - [ ] 只开放 `22`、`80` 和 `443` 端口；
 - [ ] `.env` 权限为 `600`，且未提交 Git；
-- [ ] Redis、AskData 和 EchoMind 不直接暴露公网；
+- [ ] Redis、DataAgent 和 MindAgent 不直接暴露公网；
 - [ ] 调用 `/chat` 时已使用 `X-API-Key`；
 - [ ] `/knowledge/add`、`/knowledge/upload`、`/eval/run`、`/monitor` 和 `/metrics` 不允许匿名访问；
-- [ ] AskData 仅使用只读连接，并已限制超时和最大返回行数；
+- [ ] DataAgent 仅使用只读连接，并已限制超时和最大返回行数；
 - [ ] 接入真实数据库前，已增加数据源、表和字段白名单；
 - [ ] 没有模型密钥时，数据查询采用失败关闭而非 Mock 回答；
 - [ ] 当前数据库只包含演示数据；
@@ -526,13 +526,13 @@ docker compose up -d --build
 
 演示环境至少需要备份：
 
-- EchoMind 的 `knowledge-store.json`；
-- EchoMind 的 `memory-store.json`；
+- MindAgent 的 `knowledge-store.json`；
+- MindAgent 的 `memory-store.json`；
 - Redis 持久化数据卷；
 - 服务器上的 `.env`，应使用受控的密钥管理或加密备份；
 - 将来接入的真实数据库备份。
 
-当前 AskData 会在 Pipeline 初始化时重新创建 SQLite 演示数据库，因此该数据库不应被视为可靠持久化数据源。接入真实数据库前，应改为独立只读账号和正式备份策略。
+当前 DataAgent 会在 Pipeline 初始化时重新创建 SQLite 演示数据库，因此该数据库不应被视为可靠持久化数据源。接入真实数据库前，应改为独立只读账号和正式备份策略。
 
 ## 16. 停止服务
 
@@ -579,25 +579,25 @@ docker compose down
 
 不能使用仓库中损坏的 `mvnw.cmd` 证明构建成功。部署验收应以 Linux Dockerfile 中的 Maven 构建结果为准。
 
-### 17.4 EchoMind 无法连接 AskData
+### 17.4 MindAgent 无法连接 DataAgent
 
 检查：
 
 ```bash
 docker compose ps
-docker compose logs --tail=100 askdata
-docker compose logs --tail=100 echomind
+docker compose logs --tail=100 dataagent
+docker compose logs --tail=100 mindagent
 ```
 
 环境变量应使用 Docker 服务名：
 
 ```env
-ASKDATA_BASE_URL=http://askdata:8090
+DATAAGENT_BASE_URL=http://dataagent:8090
 ```
 
 容器中不能使用 `localhost:8090` 访问另一个容器。
 
-### 17.5 EchoMind 无法连接 Redis
+### 17.5 MindAgent 无法连接 Redis
 
 Redis 主机名应使用 Compose 服务名，而不是 `localhost`：
 
@@ -606,7 +606,7 @@ REDIS_HOST=redis
 REDIS_PORT=6379
 ```
 
-同时确认 EchoMind 与 Redis 使用相同密码。
+同时确认 MindAgent 与 Redis 使用相同密码。
 
 ### 17.6 公网 IP 无法访问
 
@@ -639,8 +639,8 @@ docker compose up -d --force-recreate
 | Git 提交 | `abcdef1` |
 | 服务器地域 | 中国香港 |
 | 服务器配置 | 4 核 8 GB |
-| EchoMind 健康检查 | 通过/失败 |
-| AskData 健康检查 | 通过/失败 |
+| MindAgent 健康检查 | 通过/失败 |
+| DataAgent 健康检查 | 通过/失败 |
 | 示例数据查询 | 通过/失败 |
 | 无关查询拒答 | 通过/失败 |
 | HTTPS | 通过/失败 |

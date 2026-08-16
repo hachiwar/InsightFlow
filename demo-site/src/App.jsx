@@ -52,27 +52,27 @@ const ROUTE_SCENARIOS = [
     label: "数据分析",
     question: "近 6 个月收入增长但利润下降的月份，主要成本原因是什么？",
     intent: "DATA_QUERY",
-    agent: "DataAgent → AskData",
+    agent: "MindAgent 数据路由 → DataAgent",
     summary: "跨服务完成 Schema 检索、规划、SQL 生成、只读执行和结果解释。",
-    steps: ["DataAgent 调用 AskData /query", "关键词与向量混合召回", "SchemaGraph 与 CoT 四元组规划", "SQL 生成、只读执行与轨迹返回"],
+    steps: ["MindAgent 数据路由调用 DataAgent /query", "关键词与向量混合召回", "SchemaGraph 与 CoT 四元组规划", "SQL 生成、只读执行与轨迹返回"],
   },
 ];
 
 const CAPABILITY_GROUPS = [
   {
-    title: "EchoMind · 统一对话层",
+    title: "MindAgent · 统一对话层",
     description: "Java Spring Boot",
     items: ["/chat 统一 API 与鉴权", "会话记忆、摘要与用户画像", "意图识别与四类 Agent 路由", "知识库 RAG、回答校验与人工升级", "熔断、降级、监控和评测"],
   },
   {
-    title: "AskData · 数据推理层",
+    title: "DataAgent · 数据推理层",
     description: "Python Text2SQL",
     items: ["关键词、向量、RRF 与可降级 Rerank", "字段级 Schema 检索与 SchemaGraph", "CoT 四元组查询规划", "局部 Schema 驱动 SQL 生成", "MCPRouter 只读执行与轨迹"],
   },
   {
     title: "部署 · 运行边界",
     description: "Docker Compose",
-    items: ["Caddy 反向代理与 HTTPS", "公开 API 与内部服务独立密钥", "EchoMind、AskData、Redis 内网隔离", "只读容器与持久化数据卷", "健康检查与部署冒烟测试"],
+    items: ["Caddy 反向代理与 HTTPS", "公开 API 与内部服务独立密钥", "MindAgent、DataAgent、Redis 内网隔离", "只读容器与持久化数据卷", "健康检查与部署冒烟测试"],
   },
 ];
 
@@ -87,9 +87,9 @@ function ProjectShowcase() {
     <section className="project-showcase" id="overview" aria-labelledby="showcase-title">
       <div className="showcase-hero">
         <div>
-          <p className="section-kicker">EchoMind × AskData</p>
+          <p className="section-kicker">MindAgent × DataAgent</p>
           <h1 id="showcase-title">一个入口，连接企业知识、业务 Agent 与数据分析</h1>
-          <p>InsightFlow 用 EchoMind 负责会话、意图和 Agent 编排，用 AskData 负责结构化数据推理。下面先展示完整系统如何路由，再进入可真实执行的浏览器数据实验室。</p>
+          <p>InsightFlow 用 MindAgent 负责会话、意图和 Agent 编排，用 DataAgent 负责结构化数据推理。下面先展示完整系统如何路由，再进入可真实执行的浏览器数据实验室。</p>
           <div className="hero-actions">
             <a className="primary-link" href="#data-lab">运行数据链路</a>
             <a className="secondary-link" href="#architecture">查看完整架构</a>
@@ -100,7 +100,7 @@ function ProjectShowcase() {
           <dl>
             <div><dt>真实运行</dt><dd>SQLite、SQL 安全检查、查询结果</dd></div>
             <div><dt>可选运行</dt><dd>用户自带模型的 SQL 与结果解释</dd></div>
-            <div><dt>架构展示</dt><dd>EchoMind、AskData、Redis、Caddy</dd></div>
+            <div><dt>架构展示</dt><dd>MindAgent、DataAgent、Redis、Caddy</dd></div>
           </dl>
           <p>GitHub Pages 是静态托管，不会在本站启动 Java/Python 后端。</p>
         </div>
@@ -143,7 +143,7 @@ function ProjectShowcase() {
           <a href="https://github.com/hachiwar/InsightFlow/blob/main/docs/architecture.md" target="_blank" rel="noreferrer">阅读架构文档 ↗</a>
         </div>
         <div className="system-flow" aria-label="完整系统调用链">
-          <span>用户 / 业务系统</span><b>→</b><span>Caddy + API Key</span><b>→</b><span>EchoMind /chat</span><b>→</b><span>记忆 + RAG + 意图路由</span><b>→</b><span>专业 Agent</span><b>→</b><span>AskData（数据意图）</span>
+          <span>用户 / 业务系统</span><b>→</b><span>Caddy + API Key</span><b>→</b><span>MindAgent /chat</span><b>→</b><span>记忆 + RAG + 意图路由</span><b>→</b><span>专业 Agent</span><b>→</b><span>DataAgent（数据意图）</span>
         </div>
         <div className="capability-groups">
           {CAPABILITY_GROUPS.map((group) => (
@@ -172,10 +172,10 @@ function OperationsShowcase() {
         <span className="demo-label">仓库实现状态</span>
       </div>
       <div className="operations-grid">
-        <article><span className="operation-number">01</span><h3>入口隔离</h3><p>Caddy 只公开 80/443；EchoMind、AskData 和 Redis 仅在容器内部通信。公开 API 与内部调用使用不同密钥。</p></article>
+        <article><span className="operation-number">01</span><h3>入口隔离</h3><p>Caddy 只公开 80/443；MindAgent、DataAgent 和 Redis 仅在容器内部通信。公开 API 与内部调用使用不同密钥。</p></article>
         <article><span className="operation-number">02</span><h3>只读执行</h3><p>后端 SQLite 使用只读连接、查询模式、超时和 100 行上限。页面还会在执行前拒绝写操作和多语句。</p></article>
         <article><span className="operation-number">03</span><h3>失败降级</h3><p>知识工具包含超时、缓存与熔断；专业 Agent 失败时可降级到 GeneralAgent。页面模型解释失败时回退本地总结。</p></article>
-        <article><span className="operation-number">04</span><h3>上线验证</h3><p>Compose 提供健康检查，Caddy 管理 HTTPS，并通过冒烟测试验证鉴权、服务状态和 EchoMind → AskData 数据链路。</p></article>
+        <article><span className="operation-number">04</span><h3>上线验证</h3><p>Compose 提供健康检查，Caddy 管理 HTTPS，并通过冒烟测试验证鉴权、服务状态和 MindAgent → DataAgent 数据链路。</p></article>
       </div>
       <div className="truth-table">
         <div><strong>本页已完整覆盖</strong><span>项目定位、统一入口、四类 Agent 路由、记忆、RAG、Text2SQL、安全、降级、监控评测与部署拓扑。</span></div>
@@ -429,7 +429,7 @@ export default function App() {
       <ProjectShowcase />
 
       <section className="lab-intro" id="data-lab" aria-labelledby="lab-title">
-        <div><p className="section-kicker">真实可运行范例</p><h2 id="lab-title">AskData 数据推理实验室</h2></div>
+        <div><p className="section-kicker">真实可运行范例</p><h2 id="lab-title">DataAgent 数据推理实验室</h2></div>
         <p>选择复杂业务问题，查看从关键词识别、Schema 召回、查询规划、SQL 生成到实际数据与问题导向解释的完整链路。</p>
         <div className="topbar-badges">
           <span className={modelEnabled ? "badge model" : "badge local"}>{modelEnabled ? "自定义模型模式" : "本地演示模式"}</span>
@@ -437,7 +437,7 @@ export default function App() {
         </div>
       </section>
 
-      <main className="workspace" aria-label="AskData 数据推理实验室">
+      <main className="workspace" aria-label="DataAgent 数据推理实验室">
         <aside className="query-panel" aria-labelledby="query-title">
           <div className="panel-heading">
             <div><p className="section-kicker">自然语言入口</p><h1 id="query-title">提出业务问题</h1></div>

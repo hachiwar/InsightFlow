@@ -14,9 +14,9 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements-runtime.txt
-        working-directory: askdata/code/askdata_agent/askdata_agent
+        working-directory: dataagent/code/dataagent_agent/dataagent_agent
       - run: python -m unittest discover -s tests -v
-        working-directory: askdata/code/askdata_agent/askdata_agent
+        working-directory: dataagent/code/dataagent_agent/dataagent_agent
 
       - uses: actions/setup-java@v4
         with:
@@ -24,7 +24,7 @@ jobs:
           java-version: "21"
           cache: maven
       - run: mvn --batch-mode test
-        working-directory: echomind/EchoMindJava/EchoMindJava
+        working-directory: mindagent/MindAgentJava/MindAgentJava
 
       - uses: actions/setup-node@v6
         with:
@@ -41,5 +41,5 @@ jobs:
       - run: docker compose config --quiet
         env:
           REDIS_PASSWORD: ci-redis-password
-          ASKDATA_API_KEY: ci-internal-api-key
-          ECHOMIND_API_KEY: ci-public-api-key
+          DATAAGENT_API_KEY: ci-internal-api-key
+          MINDAGENT_API_KEY: ci-public-api-key
