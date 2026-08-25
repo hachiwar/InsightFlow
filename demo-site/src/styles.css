@@ -249,7 +249,7 @@ footer { max-width: 1320px; margin: 0 auto; padding: 24px clamp(28px,4vw,64px); 
 }
 @media (max-width: 560px) {
   .sidebar nav a { padding: 0 10px; }
-  .sidebar nav a:nth-child(2), .sidebar nav a:nth-child(3), .sidebar nav a:nth-child(6) { display: none; }
+  .sidebar nav a:nth-child(2), .sidebar nav a:nth-child(3), .sidebar nav a:nth-child(7) { display: none; }
   .overview-intro { padding-bottom: 30px; }
   .overview h1 { font-size: 43px; }
   .overview-intro > p { font-size: 17px; }

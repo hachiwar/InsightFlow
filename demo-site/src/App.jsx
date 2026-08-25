@@ -19,6 +19,7 @@ import {
 } from "./agent.js";
 
 const REPOSITORY = "https://github.com/hachiwar/InsightFlow";
+const EVALUATION_DOC = `${REPOSITORY}/blob/main/docs/evaluation.md`;
 const STAGES = ["关键词识别", "Schema 召回", "查询规划", "SQL 生成", "只读执行", "结果解释"];
 const NAV_ITEMS = [
   ["overview", "总览"],
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   ["orchestration", "Agent 编排"],
   ["data-lab", "数据实验室"],
   ["security", "安全治理"],
+  ["evaluation", "评测边界"],
   ["deployment", "部署运行"],
 ];
 const ROUTE_SCENARIOS = [
@@ -187,6 +189,10 @@ function Security() {
   return <section className="page-section" id="security"><SectionHeading title="安全治理" description="把模型输出视为不可信输入；校验、数据库权限和审计在执行层统一生效。" /><div className="security-grid"><article><span>输入边界</span><h3>解析与单语句</h3><p>拒绝多语句拼接、注释注入与不完整语法，模型输出必须先经过解析。</p></article><article><span>执行策略</span><h3>只读白名单</h3><p>仅接受单条 SELECT / WITH，拦截 INSERT、UPDATE、DELETE、DDL 与管理指令。</p></article><article><span>数据边界</span><h3>表与函数边界</h3><p>仅允许当前 Schema 中的授权对象，并拒绝文件、扩展和高风险函数。</p></article><article><span>证据留存</span><h3>结果与审计</h3><p>核对行列与数值一致性，记录 SQL 指纹、耗时、策略结果和错误信息。</p></article></div><div className="blocked-example"><code>DROP TABLE accounts;</code><strong>已拒绝</strong><span>在数据库执行前被 SQL 治理层拦截</span></div></section>;
 }
 
+function Evaluation() {
+  return <section className="page-section" id="evaluation"><SectionHeading title="评测与实现边界" description="私域离线评测验证检索和查询效果；公开站点验证工程链路，两类结果分别说明。" /><div className="architecture-details"><article><span>Schema 检索</span><h3>召回率 72% → 93%</h3><p>字段准确率由 18% 提升至 43%，候选数量策略优先保证目标字段不漏召回。</p></article><article><span>结果正确性</span><h3>单库 81% → 88.5%</h3><p>按结果集等价计算；加入结果校验和错误反馈修复后提高 7.5 个百分点。</p></article><article><span>延迟权衡</span><h3>约 100 ms → 400～500 ms</h3><p>Rerank 增加约 300～400 ms 延迟，用更高计算成本换取字段覆盖率和排序精度。</p></article></div><a className="document-link" href={EVALUATION_DOC} target="_blank" rel="noreferrer">阅读评测条件、计算方式与公开边界 <span>↗</span></a></section>;
+}
+
 function Deployment() {
   return <section className="page-section" id="deployment"><SectionHeading title="部署运行" description="GitHub Pages 承载可交互范例站；完整服务通过 Docker Compose 部署到支持 Docker 的 Linux 主机。" /><div className="deploy-layout"><ol><li><span>01</span><div><strong>准备配置</strong><p>复制 .env.example，设置域名、入口密钥、内部密钥与模型配置。</p></div></li><li><span>02</span><div><strong>启动服务</strong><p>Compose 构建 MindAgent、DataAgent、Redis 与 Caddy，内部服务不直接暴露端口。</p></div></li><li><span>03</span><div><strong>验证链路</strong><p>检查健康状态，再用带鉴权的 /chat 请求验证 MindAgent → DataAgent 调用。</p></div></li></ol><pre><code>{`cp .env.example .env
 docker compose up -d --build
@@ -203,5 +209,5 @@ export default function App() {
     window.addEventListener("scroll", syncActiveSection, { passive: true });
     return () => window.removeEventListener("scroll", syncActiveSection);
   }, []);
-  return <div className="app-shell"><a className="skip-link" href="#main">跳到主要内容</a><Sidebar activeSection={activeSection} /><main id="main"><Overview /><Architecture /><Orchestration /><DataLab /><Security /><Deployment /><footer>InsightFlow · 公开样例数据仅用于工程演示，不连接真实企业或银行数据库。</footer></main></div>;
+  return <div className="app-shell"><a className="skip-link" href="#main">跳到主要内容</a><Sidebar activeSection={activeSection} /><main id="main"><Overview /><Architecture /><Orchestration /><DataLab /><Security /><Evaluation /><Deployment /><footer>InsightFlow · 公开样例数据仅用于工程演示，不连接真实企业或银行数据库。</footer></main></div>;
 }

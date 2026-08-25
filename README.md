@@ -3,7 +3,7 @@
 [![CI](https://github.com/hachiwar/InsightFlow/actions/workflows/ci.yml/badge.svg)](https://github.com/hachiwar/InsightFlow/actions/workflows/ci.yml)
 [![GitHub Pages](https://github.com/hachiwar/InsightFlow/actions/workflows/pages.yml/badge.svg)](https://github.com/hachiwar/InsightFlow/actions/workflows/pages.yml)
 
-[在线演示](https://hachiwar.github.io/InsightFlow/) · [DataAgent 源码](dataagent/) · [MindAgent 源码](mindagent/) · [前端源码](demo-site/) · [架构设计](docs/architecture.md) · [国内服务器上线指南](docs/InsightFlow国内服务器上线指南.md)
+[在线演示](https://hachiwar.github.io/InsightFlow/) · [DataAgent 源码](dataagent/) · [MindAgent 源码](mindagent/) · [前端源码](demo-site/) · [架构设计](docs/architecture.md) · [离线评测](docs/evaluation.md) · [国内服务器上线指南](docs/InsightFlow国内服务器上线指南.md)
 
 InsightFlow 是一套面向企业知识问答与结构化数据分析的 Agent 工程。MindAgent 负责会话记忆、知识库 RAG、意图识别和多 Agent 编排；DataAgent 负责把自然语言数据问题转换为经过治理、执行、校验和解释的 SQL。仓库包含 Java 与 Python 后端、浏览器内 SQLite 交互范例、Docker Compose 部署、接口文档和自动化测试。
 
@@ -75,6 +75,12 @@ DataAgent（Python）
 - SQLite 只读连接、查询超时、结果行数上限；
 - 行列一致性、有限数值和策略结果校验；
 - 问题导向自然语言答案及 SQL 指纹、耗时和错误审计。
+
+## 离线评测
+
+私域评测覆盖约 80～100 张业务表、1,000～2,000 个字段和 600 条人工标注 Query，其中 30%～40% 为复杂问题。字段召回率由 72% 提升至 93%，字段准确率由 18% 提升至 43%；加入结果校验和错误反馈修复后，单库 SQL 执行准确率由 81% 提升至 88.5%。
+
+原始数据库与标注结果不公开，GitHub Pages 样例站不用于复现上述指标。数据条件、计算方式、多库结果和 Rerank 延迟权衡见[离线评测说明](docs/evaluation.md)。
 
 ## 在线演示
 
