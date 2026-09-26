@@ -5,12 +5,12 @@
 ## 核心模块
 
 ```text
-schema_indexing/      # Schema索引构建，离线阶段
-schema_retrieval/     # Schema检索与SchemaGraph构建
-cot_planning/         # CoT四元组规划
-sql_generation/       # SQL生成
-mcp_router/           # MCP路由执行
-dataagent_pipeline/     # 端到端流程编排
+schema_indexing/    # Schema 索引构建，离线阶段
+schema_retrieval/   # Schema 检索与 SchemaGraph 构建
+cot_planning/       # CoT 四元组规划
+sql_generation/     # SQL 生成与有限修复
+mcp_router/         # SQL 治理、执行器路由与审计
+dataagent_pipeline/ # HTTP 服务与端到端流程编排
 ```
 
 ## 端到端运行
@@ -38,17 +38,21 @@ runtime_data/trade_demo.db
   ↓
 关键词抽取
   ↓
-Schema混合检索 + RRF + Rerank
+Schema 混合检索 + RRF + Rerank
   ↓
 SchemaGraph
   ↓
-CoT四元组规划
+CoT 四元组规划
   ↓
-SQL生成
+SQL 生成
   ↓
-MCP路由执行
+SQL 只读治理
   ↓
-查询结果
+执行器路由与只读数据库执行
+  ↓
+执行失败时最多 2 次错误反馈修复
+  ↓
+结果一致性校验与问题导向总结
 ```
 
-暂不包含结果校验与回调修正。
+`POST /query` 返回自然语言答案、校验结果、分步执行轨迹和 SQL 审计信息。只有所有查询步骤均执行成功且通过一致性校验时，整体请求才标记为成功。
