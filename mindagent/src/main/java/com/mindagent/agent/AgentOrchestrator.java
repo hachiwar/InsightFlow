@@ -119,7 +119,9 @@ public class AgentOrchestrator {
             return new AgentResponse(AgentType.GENERAL, "服务暂时不可用，请稍后重试。", false, 0.0, 0, false);
         }
         AgentResponse response = agent.handle(req);
-        if (!response.success() && agentType != AgentType.GENERAL) {
+        // Keep data-query failures explicit. Falling back to the general LLM
+        // could turn an unavailable database call into an ungrounded answer.
+        if (!response.success() && agentType != AgentType.GENERAL && agentType != AgentType.DATA) {
             return bestAgent(AgentType.GENERAL).map(a -> a.handle(req)).orElse(response);
         }
         return response;
