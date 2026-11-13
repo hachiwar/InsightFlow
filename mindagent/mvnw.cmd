@@ -1,7 +1,16 @@
 @echo off
-set BASE_DIR=%~dp0
-set WRAPPER_JAR=%BASE_DIR%\.mvn\wrapper\maven-wrapper.jar
-if not exist "%WRAPPER_JAR%" (
-  powershell -Command "New-Item -ItemType Directory -Force '%BASE_DIR%\.mvn\wrapper' | Out-Null; Invoke-WebRequest -Uri 'https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.3.2/maven-wrapper-3.3.2.jar' -OutFile '%WRAPPER_JAR%'"
+setlocal
+set "BASE_DIR=%~dp0"
+set "MAVEN_VERSION=3.9.9"
+set "MAVEN_HOME=%BASE_DIR%.mvn\apache-maven-%MAVEN_VERSION%"
+set "ARCHIVE=%BASE_DIR%.mvn\apache-maven-%MAVEN_VERSION%-bin.zip"
+
+if not exist "%MAVEN_HOME%\bin\mvn.cmd" (
+  if not exist "%ARCHIVE%" curl.exe --fail --silent --show-error --location "https://archive.apache.org/dist/maven/maven-3/%MAVEN_VERSION%/binaries/apache-maven-%MAVEN_VERSION%-bin.zip" --output "%ARCHIVE%"
+  if errorlevel 1 exit /b 1
+  tar.exe -xf "%ARCHIVE%" -C "%BASE_DIR%.mvn"
+  if errorlevel 1 exit /b 1
 )
-java -jar "%WRAPPER_JAR%" %*
+
+call "%MAVEN_HOME%\bin\mvn.cmd" %*
+exit /b %ERRORLEVEL%

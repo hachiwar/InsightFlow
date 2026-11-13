@@ -57,9 +57,8 @@ class AliyunEmbeddingClient:
             self.config.api_key = os.getenv("DASHSCOPE_API_KEY", "")
 
         if not self.config.embedding_url:
-            self.config.embedding_url = os.getenv(
-                "DASHSCOPE_EMBEDDING_URL",
-                "https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings",
+            self.config.embedding_url = os.getenv("DASHSCOPE_EMBEDDING_URL") or (
+                "https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings"
             )
 
         if not self.config.api_key:

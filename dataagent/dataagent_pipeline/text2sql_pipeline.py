@@ -1,13 +1,20 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import List, Optional
 
 from cot_planning import CotPlanner, ThinkingModelClient, ThinkingModelConfig
 from mcp_router import MCPRouter, SQLiteMCPExecutor
+from schema_indexing import MilvusSchemaIndexClient, MilvusSchemaIndexConfig
+from schema_retrieval.embedding_client import AliyunEmbeddingClient, AliyunEmbeddingConfig
 from schema_retrieval.hybrid_schema_retrieval_service import (
     HybridSchemaRetrievalConfig,
     HybridSchemaRetrievalService,
+)
+from schema_retrieval.keyword_extractor_client import (
+    AliyunKeywordExtractor,
+    AliyunKeywordExtractorConfig,
 )
 from schema_retrieval.rerank_client import AliyunRerankClient, AliyunRerankConfig
 from schema_retrieval.rrf_fusion_client import RRFFusionConfig
@@ -19,7 +26,7 @@ from sql_generation import (
     SqlGenerator,
 )
 
-from .demo_data import create_trade_demo_database, get_trade_business_meta
+from .demo_data import create_trade_demo_database, get_trade_business_meta, load_business_meta
 from .local_clients import LocalHashEmbeddingClient, SimpleKeywordExtractor
 from .objects import PipelineConfig, PipelineResult, StepExecutionLog
 from .result_quality import summarize_step_logs, verify_step_logs
@@ -30,20 +37,23 @@ class DataAgentText2SQLPipeline:
     DataAgent Text2SQL 端到端流程。
 
     完整链路串联：
-    1. 创建测试数据库和 Schema 元数据
+    1. 加载已配置数据库和 Schema 元数据
     2. Schema 检索与 SchemaGraph 构建
     3. CoT 四元组规划
     4. SQL 生成
     5. SQL 治理与数据库路由执行
-    6. 有限纠错、结果一致性校验和自然语言总结
+    6. 有限纠错、执行完整性校验和自然语言总结
     """
 
     def __init__(self, config: Optional[PipelineConfig] = None):
         self.config = config or PipelineConfig()
-        self.keyword_extractor = SimpleKeywordExtractor()
-
-        self.db_path = create_trade_demo_database(self.config.db_path)
-        self.business_meta = get_trade_business_meta()
+        self.db_path = self._prepare_database()
+        self.business_meta = self._load_business_meta()
+        self.keyword_extractor = (
+            SimpleKeywordExtractor()
+            if self.config.allow_mock
+            else AliyunKeywordExtractor(AliyunKeywordExtractorConfig())
+        )
 
         self.schema_retrieval_service = self._build_schema_retrieval_service()
         self.cot_planner = self._build_cot_planner()
@@ -151,43 +161,74 @@ class DataAgentText2SQLPipeline:
         """
         构建 Schema 检索服务。
         """
-        embedding_client = LocalHashEmbeddingClient(dimensions=1024)
-
+        embedding_client = (
+            LocalHashEmbeddingClient(dimensions=self.config.embedding_dimensions)
+            if self.config.allow_mock
+            else AliyunEmbeddingClient(
+                AliyunEmbeddingConfig(dimensions=self.config.embedding_dimensions)
+            )
+        )
         rerank_client = AliyunRerankClient(
             AliyunRerankConfig(
-                api_key="",
-                workspace_id="",
-                model="qwen-rerank",
+                model="qwen3-rerank",
+                use_mock_when_unconfigured=self.config.allow_mock,
             )
         )
 
-        return HybridSchemaRetrievalService.from_sqlite(
-            db_path=self.db_path,
-            database_name=self.config.database_name,
-            business_meta=self.business_meta,
-            embedding_client=embedding_client,
-            rerank_client=rerank_client,
-            keyword_extractor=None,
-            config=HybridSchemaRetrievalConfig(
-                per_keyword_top_k=20,
-                include_join_columns=True,
-                rrf_config=RRFFusionConfig(
-                    rrf_k=60,
-                    truncate_multiplier=6,
-                    min_fused_top_k=10,
-                    max_fused_top_k=50,
-                    final_top_k=20,
-                    route_weights={
-                        "keyword": 1.0,
-                        "vector": 1.0,
-                    },
-                ),
-                rerank_top_multiplier=2,
-                rerank_min_top_n=2,
-                rerank_max_top_n=20,
-            ),
-            sample_size=self.config.sample_size,
+        milvus_uri = self.config.milvus_uri
+        if milvus_uri is None:
+            milvus_uri = self.db_path.parent / "schema_index.db"
+        if not str(milvus_uri).startswith(("http://", "https://")):
+            milvus_uri = str(Path(milvus_uri).resolve())
+        collection_prefix = re.sub(r"[^a-zA-Z0-9_]", "_", self.config.database_name)
+        if not collection_prefix or collection_prefix[0].isdigit():
+            collection_prefix = f"db_{collection_prefix}"
+        self.milvus_client = MilvusSchemaIndexClient(
+            MilvusSchemaIndexConfig(
+                uri=str(milvus_uri),
+                token=self.config.milvus_token,
+                field_collection_name=f"{collection_prefix}_schema_fields",
+                relation_collection_name=f"{collection_prefix}_schema_relations",
+                embedding_dim=self.config.embedding_dimensions,
+                recreate_collection=True,
+            )
         )
+
+        try:
+            return HybridSchemaRetrievalService.from_sqlite(
+                db_path=self.db_path,
+                database_name=self.config.database_name,
+                business_meta=self.business_meta,
+                embedding_client=embedding_client,
+                rerank_client=rerank_client,
+                milvus_client=self.milvus_client,
+                keyword_extractor=None,
+                config=HybridSchemaRetrievalConfig(
+                    per_keyword_top_k=20,
+                    include_join_columns=True,
+                    rrf_config=RRFFusionConfig(
+                        rrf_k=60,
+                        truncate_multiplier=6,
+                        min_fused_top_k=10,
+                        max_fused_top_k=50,
+                        final_top_k=20,
+                        route_weights={
+                            "keyword": 1.0,
+                            "vector": 1.0,
+                        },
+                    ),
+                    rerank_top_multiplier=2,
+                    rerank_min_top_n=2,
+                    rerank_max_top_n=20,
+                ),
+                sample_size=self.config.sample_size,
+            )
+        except Exception:
+            try:
+                self.milvus_client.close()
+            except Exception:
+                pass
+            raise
 
     def _build_cot_planner(self) -> CotPlanner:
         """
@@ -208,14 +249,82 @@ class DataAgentText2SQLPipeline:
         """
         router = MCPRouter()
 
+        allowed_tables = set(self.config.allowed_tables)
+        if not allowed_tables:
+            allowed_tables = set(self.schema_retrieval_service.tables)
+
         router.register_executor(
             database=self.config.database_name,
             executor=SQLiteMCPExecutor(
                 database=self.config.database_name,
                 db_path=self.db_path,
                 readonly=True,
-                allowed_tables=set(self.business_meta),
+                allowed_tables=allowed_tables,
             ),
         )
 
         return router
+
+    def _prepare_database(self) -> Path:
+        db_path = Path(self.config.db_path).resolve()
+        if self.config.initialize_demo:
+            return create_trade_demo_database(db_path)
+        if not db_path.is_file():
+            raise FileNotFoundError(
+                f"数据库文件不存在：{db_path}。"
+                "如需样例数据，请显式启用 initialize_demo。"
+            )
+        return db_path
+
+    def _load_business_meta(self) -> dict:
+        if self.config.business_meta_path is not None:
+            return load_business_meta(self.config.business_meta_path)
+        return get_trade_business_meta() if self.config.initialize_demo else {}
+
+    def health(self) -> dict[str, object]:
+        errors: dict[str, str] = {}
+        try:
+            mcp_result = self.mcp_router.execute(
+                {"database": self.config.database_name, "sql": "SELECT 1 AS ready;"}
+            )
+            tools = self.mcp_router.list_tools()
+            mcp_ready = mcp_result.success and "execute_readonly_sql" in tools
+            if not mcp_ready:
+                errors["mcp"] = mcp_result.error or "required tool unavailable"
+        except Exception as exc:
+            tools = []
+            mcp_ready = False
+            errors["mcp"] = str(exc)
+        try:
+            vector_ready = self.milvus_client.health()
+            if not vector_ready:
+                errors["milvus"] = "collections unavailable"
+        except Exception as exc:
+            vector_ready = False
+            errors["milvus"] = str(exc)
+        ready = (
+            self.db_path.is_file()
+            and bool(self.schema_retrieval_service.documents)
+            and vector_ready
+            and mcp_ready
+        )
+        return {
+            "status": "ok" if ready else "unavailable",
+            "database": self.config.database_name,
+            "schema_fields": len(self.schema_retrieval_service.documents),
+            "vector_store": "milvus",
+            "vector_store_ready": vector_ready,
+            "mcp_tools": tools,
+            "mcp_ready": mcp_ready,
+            "mock_mode": self.config.allow_mock,
+            "errors": errors,
+        }
+
+    def close(self) -> None:
+        self.schema_retrieval_service.close()
+
+    def __enter__(self) -> "DataAgentText2SQLPipeline":
+        return self
+
+    def __exit__(self, exc_type, exc, traceback) -> None:
+        self.close()

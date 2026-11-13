@@ -23,7 +23,7 @@ fi
 if [ ! -x "$MAVEN_HOME/bin/mvn" ]; then
   mkdir -p "$BASE_DIR/.mvn"
   if [ ! -f "$ARCHIVE" ]; then
-    curl -fsSL "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/$MAVEN_VERSION/apache-maven-$MAVEN_VERSION-bin.zip" -o "$ARCHIVE"
+    curl -fsSL "https://archive.apache.org/dist/maven/maven-3/$MAVEN_VERSION/binaries/apache-maven-$MAVEN_VERSION-bin.zip" -o "$ARCHIVE"
   fi
   unzip -q "$ARCHIVE" -d "$BASE_DIR/.mvn"
 fi

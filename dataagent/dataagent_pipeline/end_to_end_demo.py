@@ -20,6 +20,8 @@ def main() -> None:
         PipelineConfig(
             database_name="trade_db",
             db_path=Path("runtime_data") / "trade_demo.db",
+            initialize_demo=True,
+            allow_mock=True,
             sample_size=5,
         )
     )

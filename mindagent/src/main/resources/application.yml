@@ -8,9 +8,6 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:anthropic}
   jackson:
     property-naming-strategy: SNAKE_CASE
-  mvc:
-    pathmatch:
-      matching-strategy: ANT_PATH_MATCHER
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -26,14 +23,6 @@ spring:
           model: ${ANTHROPIC_MODEL:claude-sonnet-5}
           temperature: 0.2
           max-tokens: 1024
-    vectorstore:
-      chroma:
-        client:
-          host: ${CHROMA_HOST:http://localhost}
-          port: ${CHROMA_PORT:8001}
-        collection-name: ${CHROMA_COLLECTION:mindagent_knowledge}
-        initialize-schema: true
-
 management:
   endpoints:
     web:
@@ -47,6 +36,8 @@ management:
 springdoc:
   api-docs:
     path: /v3/api-docs
+  swagger-ui:
+    path: /docs
 
 mindagent:
   llm:
@@ -76,6 +67,8 @@ mindagent:
   security:
     enabled: ${MINDAGENT_AUTH_ENABLED:false}
     api-key: ${MINDAGENT_API_KEY:}
+    admin-api-key: ${MINDAGENT_ADMIN_API_KEY:}
+    principal-id: ${MINDAGENT_PRINCIPAL_ID:api-client}
 
 ---
 spring:
@@ -85,7 +78,6 @@ spring:
   autoconfigure:
     exclude:
       - org.springframework.ai.model.anthropic.autoconfigure.AnthropicChatAutoConfiguration
-      - org.springframework.ai.vectorstore.chroma.autoconfigure.ChromaVectorStoreAutoConfiguration
   ai:
     deepseek:
       api-key: ${DEEPSEEK_API_KEY:${LLM_STARTUP_API_KEY:mindagent-local-placeholder}}
@@ -104,4 +96,3 @@ spring:
   autoconfigure:
     exclude:
       - org.springframework.ai.model.deepseek.autoconfigure.DeepSeekChatAutoConfiguration
-      - org.springframework.ai.vectorstore.chroma.autoconfigure.ChromaVectorStoreAutoConfiguration

@@ -55,3 +55,25 @@ class VectorIndex:
             (int(index), float(scores[index]))
             for index in top_indices
         ]
+
+
+class MilvusVectorIndex:
+    """Milvus 字段向量索引适配器。"""
+
+    def __init__(self, embedding_client, milvus_client, doc_ids: List[str]):
+        self.embedding_client = embedding_client
+        self.milvus_client = milvus_client
+        self.doc_index = {doc_id: index for index, doc_id in enumerate(doc_ids)}
+
+    def search(self, query: str, top_k: int = 5) -> List[Tuple[int, float]]:
+        query_vector = self.embedding_client.embed_texts([query])[0].astype(float).tolist()
+        hits = self.milvus_client.search_fields(query_vector, top_k=top_k)
+        output: List[Tuple[int, float]] = []
+        for hit in hits:
+            entity = hit.get("entity") or hit
+            doc_id = entity.get("doc_id") or hit.get("id")
+            if doc_id not in self.doc_index:
+                continue
+            score = hit.get("distance", hit.get("score", 0.0))
+            output.append((self.doc_index[str(doc_id)], float(score)))
+        return output

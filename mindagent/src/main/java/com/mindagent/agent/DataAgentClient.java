@@ -14,6 +14,7 @@ import java.util.Map;
 public class DataAgentClient {
 
     private final URI queryUri;
+    private final URI healthUri;
     private final Duration timeout;
     private final String apiKey;
     private final HttpClient httpClient;
@@ -21,6 +22,7 @@ public class DataAgentClient {
 
     public DataAgentClient(String baseUrl, Duration timeout, String apiKey, ObjectMapper objectMapper) {
         this.queryUri = URI.create(baseUrl.replaceAll("/+$", "") + "/query");
+        this.healthUri = URI.create(baseUrl.replaceAll("/+$", "") + "/health");
         this.timeout = timeout;
         this.apiKey = apiKey == null ? "" : apiKey;
         this.objectMapper = objectMapper;
@@ -49,6 +51,23 @@ public class DataAgentClient {
         return format(result);
     }
 
+    public Map<String, Object> health() throws Exception {
+        HttpRequest request = HttpRequest.newBuilder(healthUri)
+                .timeout(timeout)
+                .header("Accept", "application/json")
+                .GET()
+                .build();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            throw new IllegalStateException("DataAgent health returned HTTP " + response.statusCode());
+        }
+        Map<String, Object> health = objectMapper.readValue(response.body(), new TypeReference<>() {});
+        if (!"ok".equals(health.get("status"))) {
+            throw new IllegalStateException("DataAgent is not ready: " + health);
+        }
+        return health;
+    }
+
     private String format(Map<String, Object> result) {
         StringBuilder answer = new StringBuilder();
         Object summary = result.get("answer");
@@ -58,7 +77,7 @@ public class DataAgentClient {
             answer.append("数据查询完成。\n");
         }
         if (Boolean.TRUE.equals(result.get("verified"))) {
-            answer.append("结果一致性校验：通过。\n");
+            answer.append("执行完整性校验：通过。\n");
         }
         Object logs = result.get("step_logs");
         if (logs instanceof List<?> steps) {

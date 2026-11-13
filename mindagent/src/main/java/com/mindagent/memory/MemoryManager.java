@@ -2,12 +2,14 @@ package com.mindagent.memory;
 
 import com.mindagent.config.MindAgentProperties;
 import com.mindagent.llm.LlmGateway;
+import com.mindagent.storage.AtomicJsonWriter;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -21,11 +23,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.UUID;
 
 @Service
 public class MemoryManager {
 
     private static final Logger log = LoggerFactory.getLogger(MemoryManager.class);
+    private static final DefaultRedisScript<Long> RELEASE_LOCK = new DefaultRedisScript<>(
+            "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+            Long.class
+    );
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -114,37 +121,41 @@ public class MemoryManager {
     }
 
     private void compress(String userId, String conversationId) {
-        List<ConversationMessage> messages = getWorkingMemory(userId, conversationId);
-        if (messages.size() < properties.getMemory().getCompressAt()) {
+        String lockKey = "lock:" + summaryKey(userId, conversationId);
+        String lockToken = UUID.randomUUID().toString();
+        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, lockToken, Duration.ofMinutes(2));
+        if (!Boolean.TRUE.equals(acquired)) {
             return;
         }
-        int keep = Math.min(5, messages.size());
-        List<ConversationMessage> oldMessages = messages.subList(0, messages.size() - keep);
-        List<ConversationMessage> keepMessages = messages.subList(messages.size() - keep, messages.size());
-        String text = oldMessages.stream()
-                .map(m -> m.role().name().toLowerCase() + ": " + m.content())
-                .reduce((a, b) -> a + "\n" + b)
-                .orElse("");
-        String summary;
         try {
-            summary = llmGateway.chat("", "用 2-3 句话总结以下对话关键信息：\n" + text, 0.0, 256);
-        } catch (Exception ex) {
-            summary = "对话包含 " + oldMessages.size() + " 条历史消息。";
-        }
-        episodicStore.add(new EpisodicEntry(userId, conversationId, summary, text, Instant.now(), embed(summary)));
-        persistMemory();
-        String key = wmKey(userId, conversationId);
-        try {
+            List<ConversationMessage> messages = getWorkingMemory(userId, conversationId);
+            if (messages.size() < properties.getMemory().getCompressAt()) {
+                return;
+            }
+            int keep = Math.min(5, messages.size());
+            List<ConversationMessage> oldMessages = messages.subList(0, messages.size() - keep);
+            String text = oldMessages.stream()
+                    .map(m -> m.role().name().toLowerCase() + ": " + m.content())
+                    .reduce((a, b) -> a + "\n" + b)
+                    .orElse("");
+            String summary;
+            try {
+                summary = llmGateway.chat("", "用 2-3 句话总结以下对话关键信息：\n" + text, 0.0, 256);
+            } catch (Exception ex) {
+                summary = "对话包含 " + oldMessages.size() + " 条历史消息。";
+            }
             String oldSummary = safeRedisGet(summaryKey(userId, conversationId));
             redisTemplate.opsForValue().set(summaryKey(userId, conversationId), ((oldSummary == null ? "" : oldSummary + "\n") + summary).trim(),
                     Duration.ofSeconds(properties.getMemory().getTtlSeconds()));
-            redisTemplate.delete(key);
-            for (int i = keepMessages.size() - 1; i >= 0; i--) {
-                redisTemplate.opsForList().leftPush(key, objectMapper.writeValueAsString(keepMessages.get(i)));
-            }
+            String key = wmKey(userId, conversationId);
+            redisTemplate.opsForList().trim(key, 0, keep - 1);
             redisTemplate.expire(key, Duration.ofSeconds(properties.getMemory().getTtlSeconds()));
+            episodicStore.add(new EpisodicEntry(userId, conversationId, summary, text, Instant.now(), embed(summary)));
+            persistMemory();
         } catch (Exception ex) {
             log.warn("Memory compression failed: {}", ex.getMessage());
+        } finally {
+            redisTemplate.execute(RELEASE_LOCK, List.of(lockKey), lockToken);
         }
     }
 
@@ -250,14 +261,10 @@ public class MemoryManager {
     private synchronized void persistMemory() {
         Path path = Path.of(properties.getStorage().getMemoryPath());
         try {
-            if (path.getParent() != null) {
-                Files.createDirectories(path.getParent());
-            }
             List<StoredEpisodicEntry> episodic = episodicStore.stream()
                     .map(entry -> new StoredEpisodicEntry(entry.userId(), entry.conversationId(), entry.summary(), entry.fullText(), entry.timestamp()))
                     .toList();
-            objectMapper.writerWithDefaultPrettyPrinter()
-                    .writeValue(path.toFile(), new StoredMemory(episodic, Map.copyOf(profileStore)));
+            AtomicJsonWriter.write(objectMapper, path, new StoredMemory(episodic, Map.copyOf(profileStore)));
         } catch (Exception ex) {
             log.warn("Failed to persist memory store {}: {}", path, ex.getMessage());
         }

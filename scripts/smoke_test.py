@@ -52,8 +52,13 @@ def main() -> None:
             "conversation_id": "deployment-smoke-test",
         },
     )
-    if not chat.get("response") or not chat.get("agent_type"):
+    response = str(chat.get("response", ""))
+    if chat.get("agent_type") != "data" or chat.get("intent") != "data_query":
         raise SystemExit(f"Chat check failed: {chat}")
+    if "执行完整性校验：通过" not in response or "SQL:" not in response:
+        raise SystemExit(f"Data chain was not completed: {chat}")
+    if "暂时不可用" in response:
+        raise SystemExit(f"DataAgent fallback was returned: {chat}")
     print(f"chat: ok ({chat['agent_type']})")
 
 

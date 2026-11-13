@@ -5,5 +5,4 @@ __pycache__/
 .env
 .venv/
 runtime_data/
-schema_indexing/
 *_demo.py

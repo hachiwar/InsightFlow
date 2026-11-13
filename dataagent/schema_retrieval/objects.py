@@ -70,6 +70,18 @@ class TableRelation:
     relation_type: str = "foreign_key"  # 关系类型，如 foreign_key、business_relation
     description: str = ""  # 关系业务含义
 
+    @property
+    def relation_key(self) -> str:
+        left, right = sorted([self.source_table, self.target_table])
+        return f"{self.database}:{left}__{right}"
+
+    @property
+    def join_condition(self) -> str:
+        return (
+            f"{self.source_table}.{self.source_column} = "
+            f"{self.target_table}.{self.target_column}"
+        )
+
 
 @dataclass
 class FieldDocument:

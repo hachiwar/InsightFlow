@@ -13,18 +13,22 @@ import java.util.Map;
 public class AgentConfig {
 
     @Bean
-    Map<AgentType, List<BaseAgent>> agentPool(LlmGateway llmGateway, MindAgentProperties properties, ObjectMapper objectMapper) {
-        var dataAgent = new DataAgentClient(
+    DataAgentClient dataAgentClient(MindAgentProperties properties, ObjectMapper objectMapper) {
+        return new DataAgentClient(
                 properties.getDataAgent().getBaseUrl(),
                 java.time.Duration.ofMillis(properties.getDataAgent().getTimeoutMs()),
                 properties.getDataAgent().getApiKey(),
                 objectMapper
         );
+    }
+
+    @Bean
+    Map<AgentType, List<BaseAgent>> agentPool(LlmGateway llmGateway, DataAgentClient dataAgentClient) {
         return Map.of(
                 AgentType.GENERAL, List.of(new GeneralAgent(llmGateway)),
                 AgentType.TECHNICAL, List.of(new TechnicalAgent(llmGateway)),
                 AgentType.BILLING, List.of(new BillingAgent(llmGateway)),
-                AgentType.DATA, List.of(new DataAgent(llmGateway, dataAgent))
+                AgentType.DATA, List.of(new DataAgent(llmGateway, dataAgentClient))
         );
     }
 }

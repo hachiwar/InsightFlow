@@ -1,6 +1,7 @@
 package com.mindagent.knowledge;
 
 import com.mindagent.config.MindAgentProperties;
+import com.mindagent.storage.AtomicJsonWriter;
 import dev.langchain4j.data.document.Document;
 import dev.langchain4j.data.document.DocumentSplitter;
 import dev.langchain4j.data.document.splitter.DocumentSplitters;
@@ -9,8 +10,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
@@ -35,14 +34,12 @@ public class KnowledgeBaseService {
     private static final Logger log = LoggerFactory.getLogger(KnowledgeBaseService.class);
 
     private final MindAgentProperties properties;
-    private final VectorStore vectorStore;
     private final ObjectMapper objectMapper;
     private final List<KnowledgeDocument> documents = new CopyOnWriteArrayList<>();
     private final DocumentSplitter splitter = DocumentSplitters.recursive(500, 80);
 
-    public KnowledgeBaseService(MindAgentProperties properties, ObjectProvider<VectorStore> vectorStoreProvider, ObjectMapper objectMapper) {
+    public KnowledgeBaseService(MindAgentProperties properties, ObjectMapper objectMapper) {
         this.properties = properties;
-        this.vectorStore = vectorStoreProvider.getIfAvailable();
         this.objectMapper = objectMapper;
     }
 
@@ -74,7 +71,6 @@ public class KnowledgeBaseService {
                 documents.removeIf(existing -> existing.id().equals(id));
                 documents.add(doc);
                 added++;
-                addToSpringAiVectorStore(doc);
             }
         }
         if (added > 0) {
@@ -132,18 +128,6 @@ public class KnowledgeBaseService {
         return segments;
     }
 
-    private void addToSpringAiVectorStore(KnowledgeDocument doc) {
-        if (vectorStore == null) {
-            return;
-        }
-        try {
-            org.springframework.ai.document.Document springDoc = new org.springframework.ai.document.Document(doc.id(), doc.content(), doc.metadata());
-            vectorStore.add(List.of(springDoc));
-        } catch (Exception ex) {
-            log.debug("Spring AI VectorStore write skipped: {}", ex.getMessage());
-        }
-    }
-
     private void loadPersistedDocuments() {
         Path path = Path.of(properties.getStorage().getKnowledgePath());
         if (!Files.exists(path)) {
@@ -166,7 +150,6 @@ public class KnowledgeBaseService {
                 );
                 documents.removeIf(existing -> existing.id().equals(doc.id()));
                 documents.add(doc);
-                addToSpringAiVectorStore(doc);
             }
             log.info("Loaded {} persisted knowledge chunks from {}", documents.size(), path);
         } catch (Exception ex) {
@@ -174,16 +157,13 @@ public class KnowledgeBaseService {
         }
     }
 
-    private void persistDocuments() {
+    private synchronized void persistDocuments() {
         Path path = Path.of(properties.getStorage().getKnowledgePath());
         try {
-            if (path.getParent() != null) {
-                Files.createDirectories(path.getParent());
-            }
             List<StoredKnowledgeDocument> stored = documents.stream()
                     .map(doc -> new StoredKnowledgeDocument(doc.id(), doc.title(), doc.content(), doc.chunkIndex(), doc.metadata()))
                     .toList();
-            objectMapper.writerWithDefaultPrettyPrinter().writeValue(path.toFile(), stored);
+            AtomicJsonWriter.write(objectMapper, path, stored);
         } catch (Exception ex) {
             log.warn("Failed to persist knowledge store {}: {}", path, ex.getMessage());
         }

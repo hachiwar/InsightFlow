@@ -24,7 +24,7 @@ from .embedding_client import (
     AliyunEmbeddingConfig,
 )
 
-from .vector_index import VectorIndex
+from .vector_index import MilvusVectorIndex, VectorIndex
 
 from .rrf_fusion_client import (
     RRFFusionClient,
@@ -58,6 +58,7 @@ __all__ = [
     "AliyunEmbeddingClient",
     "AliyunEmbeddingConfig",
     "VectorIndex",
+    "MilvusVectorIndex",
     "RRFFusionClient",
     "RRFFusionConfig",
     "RouteRecallResult",

@@ -71,6 +71,12 @@ public class SpringAiLlmGateway implements LlmGateway {
         }
     }
 
+    @Override
+    public boolean isReady() {
+        return chatModel != null
+                && (modelCredentialsConfigured || properties.getLlm().isFallbackEnabled());
+    }
+
     private String fallback(String userPrompt) {
         String prompt = clean(userPrompt);
         if (prompt.contains("退款") || prompt.toLowerCase().contains("refund")) {

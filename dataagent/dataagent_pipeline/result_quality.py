@@ -31,6 +31,7 @@ def verify_step_logs(step_logs: Iterable[object]) -> dict[str, object]:
         checks.append(step_checks)
 
     return {
+        "scope": "execution_integrity",
         "verified": bool(checks) and all(item["verified"] for item in checks),
         "checks": checks,
     }
@@ -43,7 +44,7 @@ def summarize_step_logs(
 ) -> str:
     logs = list(step_logs)
     if not verification.get("verified"):
-        return f"问题“{query}”未完成可信查询，执行或一致性校验未通过。"
+        return f"问题“{query}”未完成可信查询，执行完整性校验未通过。"
 
     rows: list[dict[str, Any]] = []
     columns: list[str] = []
@@ -60,6 +61,6 @@ def summarize_step_logs(
 
     unique_columns = list(dict.fromkeys(columns))
     return (
-        f"问题“{query}”查询并校验通过，共返回 {len(rows)} 行；"
+        f"问题“{query}”查询并通过执行完整性校验，共返回 {len(rows)} 行；"
         f"结果字段包括 {', '.join(unique_columns[:8])}。"
     )

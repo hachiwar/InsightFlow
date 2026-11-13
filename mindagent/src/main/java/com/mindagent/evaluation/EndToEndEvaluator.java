@@ -8,6 +8,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mindagent.intent.IntentRecognizer;
 import com.mindagent.intent.IntentResult;
+import com.mindagent.storage.AtomicJsonWriter;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Files;
@@ -210,8 +211,7 @@ public class EndToEndEvaluator {
     private void saveBaseline(Map<String, Object> report) {
         try {
             Path path = Path.of(properties.getEval().getBaselinePath());
-            Files.createDirectories(path.getParent());
-            objectMapper.writerWithDefaultPrettyPrinter().writeValue(path.toFile(), report);
+            AtomicJsonWriter.write(objectMapper, path, report);
         } catch (Exception ignored) {
         }
     }

@@ -43,3 +43,5 @@ jobs:
           REDIS_PASSWORD: ci-redis-password
           DATAAGENT_API_KEY: ci-internal-api-key
           MINDAGENT_API_KEY: ci-public-api-key
+          MINDAGENT_ADMIN_API_KEY: ci-admin-api-key
+          DATAAGENT_ALLOWED_TABLES: trade_summary,interest_info

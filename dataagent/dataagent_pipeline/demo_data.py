@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -31,6 +32,19 @@ def create_trade_demo_database(db_path: str | Path) -> Path:
     conn.close()
 
     return db_path
+
+
+def load_business_meta(path: str | Path | None) -> dict:
+    """从 JSON 加载业务元数据；未配置时返回空字典。"""
+    if path is None:
+        return {}
+    meta_path = Path(path)
+    if not meta_path.is_file():
+        raise FileNotFoundError(f"业务元数据文件不存在：{meta_path}")
+    payload = json.loads(meta_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("业务元数据顶层必须是 JSON 对象。")
+    return payload
 
 
 def get_trade_business_meta() -> dict:

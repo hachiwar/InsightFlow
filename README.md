@@ -15,15 +15,15 @@ InsightFlow 是一套面向企业知识问答与结构化数据分析的 Agent �
 | 对话与知识 | Redis 工作记忆、历史摘要、用户画像、查询改写、BM25 与向量混合检索、Rerank |
 | 数据推理 | 字段级 Schema 召回、SchemaGraph、CoT 四元组规划、局部 Schema SQL 生成和有限纠错 |
 | 执行治理 | 单语句与只读校验、危险函数拦截、表白名单、查询超时、结果上限和 SQLite 只读连接 |
-| 结果证据 | 问题导向解释、行列一致性校验、SQL 指纹、策略结果、执行耗时和错误审计 |
-| 工程交付 | Caddy、Docker Compose、双 API Key、内部网络、健康检查、冒烟测试和 GitHub Actions |
+| 结果证据 | 问题导向解释、执行完整性校验、SQL 指纹、策略结果、执行耗时和错误审计 |
+| 工程交付 | Caddy、Docker Compose、公开/管理/内部密钥隔离、真实依赖健康检查、冒烟测试和 GitHub Actions |
 
 ## 技术栈
 
 | 层级 | 技术 |
 |---|---|
 | MindAgent | Java 21、Spring Boot、Spring AI、Redis、Micrometer、OpenAPI |
-| DataAgent | Python、SQLite、HTTP API、Schema 检索、Text-to-SQL、SQL 治理 |
+| DataAgent | Python、SQLite、Milvus Lite / Milvus、官方 MCP SDK、Schema 检索、Text-to-SQL、SQL 治理 |
 | 在线范例 | React、Vite、sql.js、WebAssembly |
 | 部署与质量 | Caddy、Docker Compose、GitHub Actions、Java/Python/Node.js 自动化测试 |
 
@@ -52,9 +52,10 @@ MindAgent（Java / Spring Boot）
   └─ DATA_QUERY ───────────────┐
                                ▼
 DataAgent（Python）
-  Schema 混合检索 → SchemaGraph → CoT 四元组规划
+  Milvus 字段向量索引 + BM25 → RRF / Rerank → SchemaGraph
+  → CoT 四元组规划
   → SQL 生成 → 只读治理 → 有限纠错 → 执行
-  → 结果一致性校验 → 问题导向总结 → 审计轨迹
+  → 执行完整性校验 → 问题导向总结 → 审计轨迹
 ```
 
 ### MindAgent
@@ -68,12 +69,13 @@ DataAgent（Python）
 
 ### DataAgent
 
-- 关键词、向量、RRF 与 Rerank 组成的字段级 Schema 检索；
+- BM25 与 Milvus 字段向量双路召回、RRF 融合和真实 Rerank 服务精排；
 - SchemaGraph 和“数据库、输入、操作、输出”CoT 四元组规划；
 - 局部 Schema 驱动的 SQL 生成与最多 2 次错误反馈修复；
-- 单语句、只读关键字、危险函数和表白名单治理；
+- 官方 MCP SDK 工具发现、参数校验和工具调用，路由到已注册的只读执行器；
+- 单语句、只读关键字、危险函数、表白名单和 SQLite 运行时授权器治理；
 - SQLite 只读连接、查询超时、结果行数上限；
-- 行列一致性、有限数值和策略结果校验；
+- 执行状态、行列结构、有限数值和策略结果的完整性校验；
 - 问题导向自然语言答案及 SQL 指纹、耗时和错误审计。
 
 ## 离线评测
@@ -109,7 +111,7 @@ npm run build
 
 ```bash
 cp .env.example .env
-# 编辑 .env：替换三个密钥，并填写 MindAgent / DataAgent 模型配置
+# 编辑 .env：替换公开、管理、内部和 Redis 密钥，并填写模型配置
 docker compose config --quiet
 docker compose up -d --build
 docker compose ps
@@ -128,6 +130,7 @@ Compose 启动 `proxy`、`mindagent`、`dataagent` 和 `redis`。只有 Caddy �
 cd dataagent
 $env:PYTHONIOENCODING = "utf-8"
 $env:DATAAGENT_ALLOW_MOCK = "true"
+$env:DATAAGENT_INITIALIZE_DEMO = "true"
 python -m dataagent_pipeline.http_server
 ```
 
@@ -172,7 +175,7 @@ curl -X POST http://127.0.0.1:8080/chat \
   "query": "查询总交易笔数大于 50000 的用户利率",
   "answer": "问题……共匹配 5 条记录，年化利率为……",
   "verified": true,
-  "verification": { "verified": true, "checks": [] },
+  "verification": { "scope": "execution_integrity", "verified": true, "checks": [] },
   "step_logs": [
     {
       "database": "trade_db",
@@ -200,9 +203,9 @@ MindAgent 优先使用 `answer` 组织对话回复，同时保留 SQL 和校验�
 ## 安全设计
 
 - 模型输出在执行层按不可信输入处理；
-- 公开 `X-API-Key` 与内部 `X-Internal-API-Key` 分离；
+- 公开、管理 `X-API-Key` 与内部 `X-Internal-API-Key` 分离，用户身份由已认证客户端绑定而不是信任请求体；
 - SQL 仅允许一条 `SELECT` / `WITH`，拒绝 DML、DDL、管理指令和危险函数；
-- 数据表必须在执行器白名单内；
+- 数据表必须在执行器白名单内，SQLite authorizer 在运行时再次拦截越权对象和写操作；
 - SQLite 同时使用只读 URI 与 `PRAGMA query_only = ON`；
 - 容器使用只读文件系统、非特权模式和内部网络；
 - 返回行数、请求体和执行时间均有限制；
@@ -214,7 +217,7 @@ MindAgent 优先使用 `answer` 组织对话回复，同时保留 SQL 和校验�
 ## 自动化验证
 
 ```bash
-# Python：SQL 安全、白名单、审计、结果校验与完整 Pipeline
+# Python：MCP 协议、Milvus 检索、SQL 安全、审计、执行校验与完整 Pipeline
 cd dataagent
 python -m unittest discover -s tests -v
 
@@ -268,7 +271,7 @@ InsightFlow/
 1. 查看 MindAgent / DataAgent 的职责边界；
 2. 在在线站点运行“盈利下降”或“存款未消费”场景，逐步查看关键词、Schema、计划、SQL、结果和解释；
 3. 把 SQL 改成 `DELETE`，证明执行前会被拒绝；
-4. 展示 DataAgent 的 `verified` 与 `audit` 返回；
-5. 检查 Compose 的网络隔离、双密钥和冒烟测试。
+4. 展示 DataAgent 的 `verification.scope=execution_integrity` 与 `audit` 返回；
+5. 检查 Compose 的网络隔离、三类 API 密钥和严格冒烟测试。
 
 详细契约与关键取舍见[架构设计](docs/architecture.md)。

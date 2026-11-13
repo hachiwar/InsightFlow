@@ -9,7 +9,8 @@ dataagent_pipeline/
 ├── __init__.py
 ├── demo_data.py             # 测试数据库创建与业务Schema元数据
 ├── create_demo_db.py        # 单独创建SQLite测试库
-├── sql_execution_demo.py    # 最小MCP SQL执行Demo
+├── http_server.py           # 只读 HTTP 服务与 readiness
+├── sql_execution_demo.py    # 最小 MCP 协议执行 Demo
 ├── local_clients.py         # 本地Mock关键词抽取和Embedding
 ├── objects.py               # Pipeline数据结构
 ├── text2sql_pipeline.py     # 端到端流程编排
@@ -40,7 +41,7 @@ sql/create_trade_demo.sql
 python -m dataagent_pipeline.sql_execution_demo
 ```
 
-这个 Demo 不走大模型，只验证 MCP 路由和 SQLite 执行。
+这个 Demo 不走大模型，验证官方 MCP SDK 的工具发现/调用、SQL 治理和 SQLite 执行。
 
 ## 3. 运行端到端流程
 
@@ -51,7 +52,8 @@ python -m dataagent_pipeline.end_to_end_demo
 ## 4. 启动 MindAgent 集成接口
 
 ```bash
-python -m dataagent_pipeline.http_server
+DATAAGENT_INITIALIZE_DEMO=true DATAAGENT_ALLOW_MOCK=true \
+  python -m dataagent_pipeline.http_server
 ```
 
 接口仅暴露只读查询：
@@ -60,3 +62,5 @@ python -m dataagent_pipeline.http_server
 GET  /health
 POST /query  {"query":"查询总交易笔数大于50000的利率是多少"}
 ```
+
+默认不会创建数据库；只有显式启用 `DATAAGENT_INITIALIZE_DEMO` 才会重建样例库。完整配置见上级目录 `README.md`。

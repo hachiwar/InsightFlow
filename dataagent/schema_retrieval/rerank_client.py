@@ -64,6 +64,9 @@ class AliyunRerankConfig:
     timeout: int = 60
     """HTTP 请求超时时间，单位为秒。"""
 
+    use_mock_when_unconfigured: bool = True
+    """仅演示模式可在未配置真实服务时使用本地排序。"""
+
     instruct: str = (
         "Given a database schema field retrieval query, "
         "rank candidate schema fields by relevance to the query."
@@ -88,10 +91,23 @@ class AliyunRerankClient:
         if not self.config.workspace_id:
             self.config.workspace_id = os.getenv("DASHSCOPE_WORKSPACE_ID", "")
 
+        if not self.config.rerank_url:
+            self.config.rerank_url = os.getenv("DASHSCOPE_RERANK_URL", "")
+
         if not self.config.rerank_url and self.config.workspace_id:
             self.config.rerank_url = (
                 f"https://{self.config.workspace_id}.cn-beijing.maas.aliyuncs.com"
                 f"/compatible-api/v1/reranks"
+            )
+
+        if (
+            not self.config.use_mock_when_unconfigured
+            and (not self.config.api_key or not self.config.rerank_url)
+        ):
+            raise ValueError(
+                "缺少 DASHSCOPE_API_KEY，或未配置 DASHSCOPE_WORKSPACE_ID / "
+                "DASHSCOPE_RERANK_URL，"
+                "生产模式无法调用真实 Rerank 服务。"
             )
 
     def rerank(
@@ -117,10 +133,16 @@ class AliyunRerankClient:
         top_n = min(top_n, len(documents))
 
         if not self.config.api_key or not self.config.rerank_url:
-            return self._mock_rerank(
-                query=query,
-                documents=documents,
-                top_n=top_n,
+            if self.config.use_mock_when_unconfigured:
+                return self._mock_rerank(
+                    query=query,
+                    documents=documents,
+                    top_n=top_n,
+                )
+            raise ValueError(
+                "缺少 DASHSCOPE_API_KEY，或未配置 DASHSCOPE_WORKSPACE_ID / "
+                "DASHSCOPE_RERANK_URL，"
+                "生产模式无法调用真实 Rerank 服务。"
             )
 
         return self._call_aliyun_rerank(

@@ -116,13 +116,16 @@ chmod 600 .env
 openssl rand -hex 32
 openssl rand -hex 32
 openssl rand -hex 32
+openssl rand -hex 32
 nano .env
 ```
 
-把三次随机输出分别填入：
+把四次随机输出分别填入：
 
 ```env
 MINDAGENT_API_KEY=<公开接口密钥>
+MINDAGENT_ADMIN_API_KEY=<知识导入和评测管理密钥>
+MINDAGENT_PRINCIPAL_ID=insightflow-client
 DATAAGENT_API_KEY=<内部服务密钥>
 REDIS_PASSWORD=<Redis 密码>
 ```
@@ -151,11 +154,17 @@ LLM_FALLBACK_ENABLED=false
 
 ```env
 DASHSCOPE_API_KEY=<DashScope 密钥>
-DASHSCOPE_WORKSPACE_ID=
+DASHSCOPE_WORKSPACE_ID=<启用 qwen3-rerank 的业务空间 ID>
 DATAAGENT_ALLOW_MOCK=false
+DATAAGENT_INITIALIZE_DEMO=true
+DATAAGENT_DATABASE_NAME=trade_db
+DATAAGENT_DB_PATH=/app/runtime_data/trade_demo.db
+DATAAGENT_ALLOWED_TABLES=trade_summary,interest_info
+DATAAGENT_MILVUS_URI=/app/runtime_data/schema_index.db
 ```
 
 `DATAAGENT_ALLOW_MOCK=true` 只用于本机验证内置交易查询；公开地址始终使用 `false`。
+上面的 `DATAAGENT_INITIALIZE_DEMO=true` 用于仓库自带样例库。接入已有 SQLite 时改为 `false`，把数据库放入 DataAgent 数据卷，修改路径、数据库名和最小表白名单；服务不会重建该文件。`DATAAGENT_MILVUS_URI` 使用本地 Milvus Lite，较大规模可改为远程 Milvus 地址并配置 `DATAAGENT_MILVUS_TOKEN`。
 
 检查配置文件中没有示例密码：
 
@@ -207,7 +216,7 @@ curl --fail --show-error http://<服务器公网IP>/health
 预期返回：
 
 ```json
-{"status":"ok"}
+{"status":"ok","checks":{"redis":"ok","data_agent":{"status":"ok"},"llm":"ok"}}
 ```
 
 ### 9.2 鉴权检查
@@ -280,11 +289,12 @@ curl --fail --show-error https://api.example.com/health
 ## 11. 发布前安全检查
 
 - [ ] `.env` 权限为 `600`，且 `git status` 不显示该文件；
-- [ ] 三个密钥随机、互不相同，测试期间暴露的旧 Key 已撤销；
+- [ ] 公开、管理、内部和 Redis 四个密钥随机、互不相同，测试期间暴露的旧 Key 已撤销；
 - [ ] 云防火墙只开放 `22/80/443`；
 - [ ] Redis、MindAgent 和 DataAgent 没有公网端口；
 - [ ] 未授权 `/chat` 返回 `401`；
 - [ ] `DATAAGENT_ALLOW_MOCK=false`；
+- [ ] `/health` 中 Redis、DataAgent（含 Milvus/MCP）和 LLM 均为 `ok`；
 - [ ] 数据库账号或 SQLite 连接为只读；
 - [ ] 表白名单只包含允许查询的业务表；
 - [ ] 冒烟测试通过；

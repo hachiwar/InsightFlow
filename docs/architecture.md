@@ -29,10 +29,10 @@ MindAgent :8080
                               │
                               ▼
                          DataAgent :8090
-                              ├── Schema Retrieval
+                              ├── BM25 + Milvus Schema Retrieval
                               ├── CoT Planner
                               ├── SQL Generator / Repair
-                              ├── SQL Governance / MCPRouter
+                              ├── SQL Governance / MCP SDK Tool
                               └── Read-only SQLite
 ```
 
@@ -73,9 +73,10 @@ POST /chat
 | `LocalSchemaStore` | 为每个查询步骤提取最小局部 Schema |
 | `SqlGenerator` | 生成 SQL，并根据数据库错误有限修复 |
 | `validate_readonly_sql` | 单语句、只读关键字、危险函数和表白名单校验 |
-| `MCPRouter` | 按数据库名称路由已注册执行器 |
-| `SQLiteMCPExecutor` | 只读连接、超时、行数上限、结果与审计 |
-| `verify_step_logs` | 校验执行状态、行数、列集合、数值和 SQL 策略 |
+| `MilvusSchemaIndexClient` | 建立、写入和查询字段向量及表关系 Collection；本地使用 Milvus Lite，也可连接远程 Milvus |
+| `MCPRouter` | 通过官方 MCP SDK 完成工具发现、Schema 参数校验和工具调用，再按数据库名称路由执行器 |
+| `SQLiteMCPExecutor` | 静态治理、SQLite 运行时授权器、只读连接、超时、行数上限、结果与审计 |
+| `verify_step_logs` | 校验执行状态、行数、列集合、数值和 SQL 策略，不冒充业务语义判定 |
 | `summarize_step_logs` | 结合原问题和已校验结果生成自然语言答案 |
 
 ### 数据查询请求
@@ -89,9 +90,9 @@ POST /query
 → 规划一个或多个 CoT 步骤
 → 按局部 Schema 生成 SQL
 → SQL 治理
-→ 只读数据库执行
+→ MCP 工具调用与只读数据库执行
 → 执行失败时最多修复 2 次
-→ 结果一致性校验
+→ 执行完整性校验
 → 问题导向总结
 → 返回步骤、答案、校验与审计
 ```
@@ -123,6 +124,7 @@ Content-Type: application/json
   "answer": "问题……共匹配 5 条记录，年化利率为……",
   "verified": true,
   "verification": {
+    "scope": "execution_integrity",
     "verified": true,
     "checks": [
       {
@@ -169,7 +171,7 @@ Content-Type: application/json
 }
 ```
 
-`success` 只有在所有查询步骤均执行成功且通过一致性校验时才为 `true`。MindAgent 优先展示 `answer`，同时保留步骤轨迹供日志、调试和评测使用。
+`success` 只有在所有查询步骤均执行成功且通过执行完整性校验时才为 `true`。这个字段不等于自然语言问题的业务语义已被证明正确；语义正确性在离线评测中通过标准结果集判定。MindAgent 优先展示 `answer`，同时保留步骤轨迹供日志、调试和评测使用。
 
 ## 6. SQL 安全模型
 
@@ -179,7 +181,7 @@ Content-Type: application/json
 2. **关键字策略**：拒绝写入、DDL 和数据库管理指令；
 3. **函数策略**：拒绝文件读写和扩展加载函数；
 4. **对象策略**：`FROM` / `JOIN` 引用必须位于表白名单；
-5. **连接策略**：SQLite 以只读 URI 打开，并启用 `query_only`；
+5. **连接策略**：SQLite 以只读 URI 打开，启用 `query_only`，并用 authorizer 在运行时拒绝越权表、写操作和危险函数；
 6. **资源策略**：设置执行超时和最大返回行数；
 7. **证据策略**：每次执行返回 SQL 指纹、耗时、策略结果和错误；
 8. **结果策略**：行数、列集合、数值有效性和每步执行状态必须一致。
@@ -203,7 +205,7 @@ SQL 明文保留在受控的请求步骤中用于复核，审计摘要只保存 
 
 - Caddy 是唯一公开端口；
 - MindAgent、DataAgent、Redis 只连接 Compose 内部网络；
-- 公开和内部 API 使用不同密钥；
+- 公开、管理和内部 API 使用不同密钥；对话身份由认证配置绑定，不采用请求体传入的 `user_id`；
 - DataAgent 与 MindAgent 使用只读容器文件系统，持久化目录通过命名卷挂载；
 - 健康检查控制服务启动顺序；
 - `scripts/smoke_test.py` 验证 `/health` 和完整 `/chat` 数据链路。
@@ -212,8 +214,8 @@ GitHub Pages 仅承载 React + sql.js 范例站，浏览器内 SQLite 与服务�
 
 ## 9. 验证策略
 
-- Python：SQL 拒绝、表白名单、审计和 Pipeline 结果校验；
-- Java：意图、编排、DataAgent 客户端、鉴权、知识检索和 API 测试；
+- Python：真实 MCP 协议、Milvus 写入/检索、SQL 拒绝、运行时白名单、审计和 Pipeline 执行校验；
+- Java：意图、编排、DataAgent 客户端、公开/管理鉴权和原子持久化测试；
 - Frontend：3 个复杂 SQL 场景、只读拦截、模型协议、解释和错误修复；
 - Deployment：Compose 配置解析、容器健康检查和端到端冒烟测试；
 - CI：Pull Request 与 `main` 使用同一组自动化检查。

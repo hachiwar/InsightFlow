@@ -20,19 +20,19 @@ public class ToolStats {
         }
     }
 
-    public long total() {
+    public synchronized long total() {
         return total;
     }
 
-    public double successRate() {
+    public synchronized double successRate() {
         return total == 0 ? 1.0 : (double) success / total;
     }
 
-    public double avgLatencyMs() {
+    public synchronized double avgLatencyMs() {
         return total == 0 ? 0.0 : (double) totalLatencyMs / total;
     }
 
-    public int consecutiveFails() {
+    public synchronized int consecutiveFails() {
         return consecutiveFails;
     }
 }

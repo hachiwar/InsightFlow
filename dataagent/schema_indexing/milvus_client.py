@@ -11,8 +11,7 @@ from .objects import FieldDocument, TableRelation
 class MilvusSchemaIndexConfig:
     """Milvus Schema 索引配置。"""
 
-    # 目前milvus不启用服务，保存在本地生成一个db文件
-    uri: str = "./schema_index_demo.db"
+    uri: str = "./schema_index.db"
     token: str = ""
 
     field_collection_name: str = "schema_field_index_demo"
@@ -46,6 +45,7 @@ class MilvusSchemaIndexClient:
         self.client = MilvusClient(
             uri=self.config.uri,
             token=self.config.token or None,
+            dedicated=True,
         )
 
     def prepare_collections(self) -> None:
@@ -95,8 +95,11 @@ class MilvusSchemaIndexClient:
         self.client.create_collection(
             collection_name=name,
             schema=schema,
-            index_params=index_params,
         )
+        # shortcut: Lite 精确搜索足够覆盖 Schema 规模；需要 ANN 时改用远程 Milvus。
+        if not self._is_lite():
+            self.client.create_index(name, index_params)
+            self.client.load_collection(name)
 
     def prepare_relation_collection(self) -> None:
         """
@@ -133,11 +136,22 @@ class MilvusSchemaIndexClient:
         schema.add_field("join_condition", DataType.VARCHAR, max_length=512)
         schema.add_field("description", DataType.VARCHAR, max_length=1024)
         schema.add_field("relation_json", DataType.VARCHAR, max_length=4096)
+        schema.add_field("embedding", DataType.FLOAT_VECTOR, dim=2)
+
+        index_params = self.client.prepare_index_params()
+        index_params.add_index(
+            field_name="embedding",
+            index_type="AUTOINDEX",
+            metric_type="COSINE",
+        )
 
         self.client.create_collection(
             collection_name=name,
             schema=schema,
         )
+        if not self._is_lite():
+            self.client.create_index(name, index_params)
+            self.client.load_collection(name)
 
     def insert_field_documents(
         self,
@@ -173,10 +187,6 @@ class MilvusSchemaIndexClient:
             data=rows,
         )
 
-        self.client.flush(
-            collection_name=self.config.field_collection_name,
-        )
-
     def insert_relations(self, relations: List[TableRelation]) -> None:
         """
         写入表间关系。
@@ -210,6 +220,7 @@ class MilvusSchemaIndexClient:
                     "join_condition": relation.join_condition,
                     "description": relation.description,
                     "relation_json": json.dumps(relation_payload, ensure_ascii=False),
+                    "embedding": [1.0, 0.0],
                 }
             )
 
@@ -219,10 +230,6 @@ class MilvusSchemaIndexClient:
         self.client.insert(
             collection_name=self.config.relation_collection_name,
             data=rows,
-        )
-
-        self.client.flush(
-            collection_name=self.config.relation_collection_name,
         )
 
     def search_fields(
@@ -274,7 +281,7 @@ class MilvusSchemaIndexClient:
             for left, right in table_pairs
         ]
 
-        quoted_keys = ", ".join([f'"{key}"' for key in relation_keys])
+        quoted_keys = ", ".join(json.dumps(key, ensure_ascii=False) for key in relation_keys)
         filter_expr = f"relation_key in [{quoted_keys}]"
 
         rows = self.client.query(
@@ -312,3 +319,35 @@ class MilvusSchemaIndexClient:
         """构建无向表关系 key。"""
         left, right = sorted([table_a, table_b])
         return f"{database}:{left}__{right}"
+
+    def health(self) -> bool:
+        """确认两个 Schema Collection 可访问。"""
+        if not self.client.has_collection(
+            self.config.field_collection_name
+        ) or not self.client.has_collection(self.config.relation_collection_name):
+            return False
+        self.client.query(
+            collection_name=self.config.field_collection_name,
+            filter="",
+            output_fields=["doc_id"],
+            limit=1,
+        )
+        self.client.query(
+            collection_name=self.config.relation_collection_name,
+            filter="",
+            output_fields=["relation_key"],
+            limit=1,
+        )
+        return True
+
+    def _is_lite(self) -> bool:
+        return self.config.uri.endswith(".db") and not self.config.uri.startswith(
+            ("http://", "https://")
+        )
+
+    def close(self) -> None:
+        self.client.close()
+        if self._is_lite():
+            from milvus_lite import server_manager_instance
+
+            server_manager_instance.release_server(self.config.uri)

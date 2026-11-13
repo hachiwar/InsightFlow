@@ -33,6 +33,21 @@ class MCPExecutionResult:
     error: Optional[str] = None
     audit: Dict[str, Any] = field(default_factory=dict)
 
+    @classmethod
+    def from_dict(cls, value: Dict[str, Any]) -> "MCPExecutionResult":
+        """从 MCP 工具的结构化输出恢复执行结果。"""
+        return cls(
+            database=str(value.get("database", "")),
+            sql=str(value.get("sql", "")),
+            success=value.get("success") is True,
+            columns=[str(item) for item in value.get("columns", [])],
+            rows=list(value.get("rows", [])),
+            row_count=int(value.get("row_count", 0)),
+            truncated=value.get("truncated") is True,
+            error=str(value["error"]) if value.get("error") is not None else None,
+            audit=dict(value.get("audit", {})),
+        )
+
     def to_dict(self) -> Dict[str, Any]:
         """转换为可序列化字典。"""
         return {

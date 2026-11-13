@@ -11,8 +11,14 @@ class PipelineConfig:
 
     database_name: str = "trade_db"
     db_path: str | Path = "runtime_data/trade_demo.db"
+    initialize_demo: bool = False
+    business_meta_path: str | Path | None = None
+    allowed_tables: tuple[str, ...] = ()
+    milvus_uri: str | Path | None = None
+    milvus_token: str = ""
+    embedding_dimensions: int = 1024
     sample_size: int = 5
-    allow_mock: bool = True
+    allow_mock: bool = False
     max_repair_attempts: int = 2
 
 

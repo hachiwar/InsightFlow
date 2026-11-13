@@ -3,6 +3,7 @@ package com.mindagent.api;
 import com.mindagent.agent.AgentOrchestrator;
 import com.mindagent.agent.AgentRequest;
 import com.mindagent.agent.AnswerVerifier;
+import com.mindagent.agent.DataAgentClient;
 import com.mindagent.agent.OrchestratorResult;
 import com.mindagent.api.dto.BatchDocInput;
 import com.mindagent.api.dto.ChatRequest;
@@ -14,7 +15,9 @@ import com.mindagent.knowledge.SearchResult;
 import com.mindagent.memory.MemoryContext;
 import com.mindagent.memory.MemoryManager;
 import com.mindagent.memory.MessageRole;
+import com.mindagent.llm.LlmGateway;
 import com.mindagent.monitor.PerformanceMonitor;
+import com.mindagent.security.ApiKeyFilter;
 import com.mindagent.tool.KnowledgeToolManager;
 import com.mindagent.tool.ToolResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,8 +26,12 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.data.redis.connection.RedisConnection;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -51,6 +58,9 @@ public class MindAgentController {
     private final EndToEndEvaluator evaluator;
     private final ObjectMapper objectMapper;
     private final PrometheusMeterRegistry prometheusMeterRegistry;
+    private final DataAgentClient dataAgentClient;
+    private final LlmGateway llmGateway;
+    private final StringRedisTemplate redisTemplate;
 
     public MindAgentController(
             AgentOrchestrator orchestrator,
@@ -61,7 +71,10 @@ public class MindAgentController {
             PerformanceMonitor performanceMonitor,
             EndToEndEvaluator evaluator,
             ObjectMapper objectMapper,
-            PrometheusMeterRegistry prometheusMeterRegistry
+            PrometheusMeterRegistry prometheusMeterRegistry,
+            DataAgentClient dataAgentClient,
+            LlmGateway llmGateway,
+            StringRedisTemplate redisTemplate
     ) {
         this.orchestrator = orchestrator;
         this.memoryManager = memoryManager;
@@ -72,18 +85,49 @@ public class MindAgentController {
         this.evaluator = evaluator;
         this.objectMapper = objectMapper;
         this.prometheusMeterRegistry = prometheusMeterRegistry;
+        this.dataAgentClient = dataAgentClient;
+        this.llmGateway = llmGateway;
+        this.redisTemplate = redisTemplate;
     }
 
     @GetMapping("/health")
     @Operation(summary = "健康检查", description = "返回服务状态和 Agent 路由统计。")
-    public Map<String, Object> health() {
-        return Map.of("status", "ok");
+    public ResponseEntity<Map<String, Object>> health() {
+        Map<String, Object> checks = new LinkedHashMap<>();
+        boolean redisReady = false;
+        try (RedisConnection connection = redisTemplate.getConnectionFactory().getConnection()) {
+            redisReady = "PONG".equalsIgnoreCase(connection.ping());
+            checks.put("redis", redisReady ? "ok" : "unavailable");
+        } catch (Exception ex) {
+            checks.put("redis", "unavailable: " + ex.getClass().getSimpleName());
+        }
+
+        boolean dataAgentReady = false;
+        try {
+            Map<String, Object> dataHealth = dataAgentClient.health();
+            dataAgentReady = "ok".equals(dataHealth.get("status"));
+            checks.put("data_agent", dataAgentReady ? dataHealth : "unavailable");
+        } catch (Exception ex) {
+            checks.put("data_agent", "unavailable: " + ex.getClass().getSimpleName());
+        }
+
+        boolean llmReady = llmGateway.isReady();
+        checks.put("llm", llmReady ? "ok" : "unavailable");
+        boolean ready = redisReady && dataAgentReady && llmReady;
+        Map<String, Object> body = Map.of(
+                "status", ready ? "ok" : "unavailable",
+                "checks", checks
+        );
+        return ResponseEntity.status(ready ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE).body(body);
     }
 
     @PostMapping("/chat")
     @Operation(summary = "智能客服对话", description = "执行完整对话链路：记忆读取、知识库检索、意图识别、多 Agent 路由、回答校验和记忆写入。")
-    public ChatResponse chat(@Valid @RequestBody ChatRequest request) {
-        String userId = request.userIdOrDefault();
+    public ChatResponse chat(@Valid @RequestBody ChatRequest request, HttpServletRequest servletRequest) {
+        Object authenticated = servletRequest.getAttribute(ApiKeyFilter.AUTHENTICATED_USER_ATTRIBUTE);
+        String userId = authenticated instanceof String principal && !principal.isBlank()
+                ? principal
+                : request.userIdOrDefault();
         String conversationId = request.conversationId() == null || request.conversationId().isBlank()
                 ? UUID.randomUUID().toString()
                 : request.conversationId();

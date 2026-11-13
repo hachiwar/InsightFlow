@@ -80,9 +80,8 @@ class AliyunKeywordExtractor:
             self.config.api_key = os.getenv("DASHSCOPE_API_KEY", "")
 
         if not self.config.chat_url:
-            self.config.chat_url = os.getenv(
-                "DASHSCOPE_CHAT_URL",
-                "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+            self.config.chat_url = os.getenv("DASHSCOPE_CHAT_URL") or (
+                "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
             )
 
         if not self.config.api_key:

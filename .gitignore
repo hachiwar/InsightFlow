@@ -17,3 +17,4 @@ target/
 runtime_data/
 node_modules/
 dist/
+/mindagent/.mvn/apache-maven-*

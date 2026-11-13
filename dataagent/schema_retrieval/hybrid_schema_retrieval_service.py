@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from itertools import combinations
 from typing import Dict, List, Optional, Sequence
 
+from schema_indexing.objects import FieldDocument as IndexedFieldDocument
 from schema_retrieval.bm25 import BM25Index
 from schema_retrieval.embedding_client import (
     AliyunEmbeddingClient,
@@ -28,7 +30,7 @@ from schema_retrieval.rrf_fusion_client import (
     RouteRecallResult,
 )
 from schema_retrieval.sqlite_loader import SQLiteSchemaLoader
-from schema_retrieval.vector_index import VectorIndex
+from schema_retrieval.vector_index import MilvusVectorIndex, VectorIndex
 
 
 @dataclass
@@ -129,6 +131,7 @@ class HybridSchemaRetrievalService:
         business_meta: Optional[dict],
         embedding_client: AliyunEmbeddingClient,
         rerank_client: AliyunRerankClient,
+        milvus_client=None,
         keyword_extractor: Optional[AliyunKeywordExtractor] = None,
         config: Optional[HybridSchemaRetrievalConfig] = None,
     ):
@@ -138,6 +141,7 @@ class HybridSchemaRetrievalService:
         self.business_meta = business_meta or {}
         self.embedding_client = embedding_client
         self.rerank_client = rerank_client
+        self.milvus_client = milvus_client
         self.keyword_extractor = keyword_extractor
         self.config = config or HybridSchemaRetrievalConfig()
 
@@ -158,6 +162,7 @@ class HybridSchemaRetrievalService:
         business_meta: Optional[dict],
         embedding_client: AliyunEmbeddingClient,
         rerank_client: AliyunRerankClient,
+        milvus_client=None,
         keyword_extractor: Optional[AliyunKeywordExtractor] = None,
         config: Optional[HybridSchemaRetrievalConfig] = None,
         sample_size: int = 5,
@@ -194,6 +199,7 @@ class HybridSchemaRetrievalService:
             business_meta=business_meta,
             embedding_client=embedding_client,
             rerank_client=rerank_client,
+            milvus_client=milvus_client,
             keyword_extractor=keyword_extractor,
             config=config,
         )
@@ -235,11 +241,12 @@ class HybridSchemaRetrievalService:
             fusion_hits=fusion_hits,
         )
 
+        graph_relations = self._relations_for_hits(schema_hits)
         schema_graph = build_schema_graph(
             hits=schema_hits,
             tables=self.tables,
             all_columns=self.columns,
-            relations=self.relations,
+            relations=graph_relations,
             include_join_columns=self.config.include_join_columns,
         )
         return HybridSchemaRetrievalResult(
@@ -433,8 +440,51 @@ class HybridSchemaRetrievalService:
             for doc in self.documents
         ]
 
-        self.vector_index = VectorIndex(self.embedding_client)
-        self.vector_index.build(vector_texts)
+        if self.milvus_client is None:
+            self.vector_index = VectorIndex(self.embedding_client)
+            self.vector_index.build(vector_texts)
+            return
+
+        indexed_documents = [
+            IndexedFieldDocument(
+                doc_id=doc.doc_id,
+                column=doc.column,
+                keyword_text=doc.keyword_text,
+                vector_text=doc.vector_text,
+                rerank_text=doc.rerank_text,
+            )
+            for doc in self.documents
+        ]
+        try:
+            embeddings = self.embedding_client.embed_texts(vector_texts)
+            self.milvus_client.prepare_collections()
+            self.milvus_client.insert_field_documents(
+                indexed_documents,
+                [vector.astype(float).tolist() for vector in embeddings],
+            )
+            self.milvus_client.insert_relations(self.relations)
+        except Exception:
+            self.milvus_client.close()
+            raise
+        self.vector_index = MilvusVectorIndex(
+            self.embedding_client,
+            self.milvus_client,
+            [doc.doc_id for doc in self.documents],
+        )
+
+    def _relations_for_hits(self, schema_hits: List[SchemaHit]) -> list:
+        if self.milvus_client is None:
+            return self.relations
+        table_names = sorted({hit.column.table_name for hit in schema_hits})
+        table_pairs = list(combinations(table_names, 2))
+        if not table_pairs:
+            return []
+        database = schema_hits[0].column.database if schema_hits else ""
+        return self.milvus_client.query_relations_by_table_pairs(database, table_pairs)
+
+    def close(self) -> None:
+        if self.milvus_client is not None:
+            self.milvus_client.close()
 
     def _build_documents(self) -> None:
         """

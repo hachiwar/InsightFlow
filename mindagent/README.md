@@ -31,7 +31,7 @@ MindAgent DATA_QUERY
 |---|---|
 | 语言与框架 | Java 21、Spring Boot 3.5、Spring AI 1.1 |
 | 模型 | DeepSeek、Anthropic Spring profile |
-| 记忆 | Redis 工作记忆、JSON 历史摘要与用户画像 |
+| 记忆 | Redis 工作记忆与分布式压缩锁、原子 JSON 历史摘要与用户画像 |
 | 知识库 | BM25、本地 Hash Vector、加权融合、LLM Rerank |
 | 文档处理 | LangChain4j DocumentSplitter |
 | 可靠性 | 超时、缓存、熔断、Fallback、回答校验 |
@@ -43,7 +43,7 @@ MindAgent DATA_QUERY
 
 | 组件 | 职责 |
 |---|---|
-| `MindAgentController` | 对话、知识库、监控和评测 API |
+| `MindAgentController` | 对话、真实依赖健康检查、知识库、监控和评测 API |
 | `MemoryManager` | 工作记忆、摘要、长期记忆和画像 |
 | `KnowledgeToolManager` | 查询改写、并行召回、融合、Rerank 与可靠性控制 |
 | `IntentRecognizer` | LLM、字符 n-gram 和模式规则融合识别 |
@@ -62,13 +62,13 @@ MindAgent DATA_QUERY
 | GET | `/health` | 健康检查 |
 | POST | `/chat` | 统一对话入口 |
 | POST | `/search` | 企业知识检索 |
-| POST | `/knowledge/add` | 批量添加知识文档 |
-| POST | `/knowledge/upload` | 上传 `.txt`、`.md`、`.json` |
+| POST | `/knowledge/add` | 批量添加知识文档（管理密钥） |
+| POST | `/knowledge/upload` | 上传 `.txt`、`.md`、`.json`（管理密钥） |
 | GET | `/knowledge/stats` | 知识库统计 |
 | GET | `/monitor` | 监控摘要 |
 | GET | `/metrics` | Prometheus 文本指标 |
 | GET | `/actuator/prometheus` | Actuator Prometheus 指标 |
-| POST | `/eval/run` | 运行评测 |
+| POST | `/eval/run` | 运行评测（管理密钥） |
 | GET | `/docs` | Swagger UI |
 | GET | `/v3/api-docs` | OpenAPI JSON |
 
@@ -130,10 +130,10 @@ export DATAAGENT_API_KEY=your-internal-key
 
 ## 本地运行
 
-准备 JDK 21、Maven 和 Redis。先启动 DataAgent，再运行：
+准备 JDK 21 和 Redis。先启动 DataAgent，再运行仓库自带的 Maven Wrapper：
 
 ```bash
-mvn spring-boot:run
+./mvnw spring-boot:run
 ```
 
 Windows PowerShell：
@@ -142,7 +142,7 @@ Windows PowerShell：
 $env:SPRING_PROFILES_ACTIVE = "deepseek"
 $env:DEEPSEEK_API_KEY = "your-key"
 $env:DATAAGENT_BASE_URL = "http://127.0.0.1:8090"
-mvn spring-boot:run
+.\mvnw.cmd spring-boot:run
 ```
 
 验证：
@@ -154,10 +154,10 @@ curl http://127.0.0.1:8080/health
 ## 测试
 
 ```bash
-mvn --batch-mode test
+./mvnw --batch-mode test
 ```
 
-测试覆盖数据意图规则回退、公开 API 鉴权，以及 DataAgent 内部密钥和问题导向答案契约。
+测试覆盖数据意图规则回退、公开/管理密钥隔离、认证身份绑定、DataAgent 内部密钥与健康契约、OpenAPI 启动链路，以及原子 JSON 持久化。启用认证时，请求体中的 `user_id` 不作为身份来源；服务使用 `MINDAGENT_PRINCIPAL_ID` 绑定会话和记忆。
 
 ## Docker
 

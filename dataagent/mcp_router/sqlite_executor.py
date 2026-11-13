@@ -18,8 +18,7 @@ class SQLiteMCPExecutor:
     """
     SQLite MCP 执行器。
 
-    这里模拟 MCP 路由到数据库 API 后的执行过程。
-    为了 Demo 安全，只允许执行 SELECT / WITH 查询。
+    由 MCP 工具调用，只允许执行经过治理的 SELECT / WITH 查询。
     """
 
     def __init__(
@@ -92,6 +91,7 @@ class SQLiteMCPExecutor:
             conn.row_factory = sqlite3.Row
             if self.readonly:
                 conn.execute("PRAGMA query_only = ON")
+                self._install_readonly_authorizer(conn)
             deadline = time.monotonic() + self.timeout
             conn.set_progress_handler(
                 lambda: 1 if time.monotonic() > deadline else 0,
@@ -145,3 +145,25 @@ class SQLiteMCPExecutor:
         finally:
             if conn is not None:
                 conn.close()
+
+    def _install_readonly_authorizer(self, conn: sqlite3.Connection) -> None:
+        allowlist = {table.lower() for table in self.allowed_tables or ()}
+        allowed_actions = {sqlite3.SQLITE_SELECT, getattr(sqlite3, "SQLITE_RECURSIVE", -1)}
+        blocked_functions = {"load_extension", "writefile", "readfile", "fts3_tokenizer"}
+
+        def authorize(
+            action: int,
+            arg1: str | None,
+            arg2: str | None,
+            database: str | None,
+            trigger: str | None,
+        ) -> int:
+            if action == sqlite3.SQLITE_READ:
+                table = (arg1 or "").rsplit(".", 1)[-1].lower()
+                return sqlite3.SQLITE_OK if not allowlist or table in allowlist else sqlite3.SQLITE_DENY
+            if action == sqlite3.SQLITE_FUNCTION:
+                function = (arg2 or arg1 or "").lower()
+                return sqlite3.SQLITE_DENY if function in blocked_functions else sqlite3.SQLITE_OK
+            return sqlite3.SQLITE_OK if action in allowed_actions else sqlite3.SQLITE_DENY
+
+        conn.set_authorizer(authorize)

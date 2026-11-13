@@ -34,6 +34,7 @@ class CoderModelClient:
 
         if not self.config.api_key:
             self.config.api_key = os.getenv("DASHSCOPE_API_KEY", "")
+        self.config.base_url = os.getenv("DASHSCOPE_CHAT_URL") or self.config.base_url
 
     def generate_sql(self, prompt: str) -> str:
         """

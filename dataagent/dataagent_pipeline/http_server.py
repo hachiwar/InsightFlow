@@ -4,11 +4,16 @@ import argparse
 import hmac
 import json
 import os
+import signal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from .objects import PipelineConfig
 from .text2sql_pipeline import DataAgentText2SQLPipeline
+
+
+def _terminate(_signum: int, _frame: object) -> None:
+    raise KeyboardInterrupt
 
 
 class DataAgentHandler(BaseHTTPRequestHandler):
@@ -18,7 +23,8 @@ class DataAgentHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == "/health":
-            self._json(200, {"status": "ok"})
+            health = self.pipeline.health()
+            self._json(200 if health.get("status") == "ok" else 503, health)
         else:
             self._json(404, {"error": "not_found"})
 
@@ -71,6 +77,16 @@ def main() -> None:
     parser.add_argument("--host", default=os.getenv("DATAAGENT_HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.getenv("DATAAGENT_PORT", "8090")))
     parser.add_argument("--db", default=os.getenv("DATAAGENT_DB_PATH", "runtime_data/trade_demo.db"))
+    parser.add_argument("--database-name", default=os.getenv("DATAAGENT_DATABASE_NAME", "trade_db"))
+    parser.add_argument("--business-meta", default=os.getenv("DATAAGENT_BUSINESS_META_PATH", ""))
+    parser.add_argument("--milvus-uri", default=os.getenv("DATAAGENT_MILVUS_URI", ""))
+    parser.add_argument("--milvus-token", default=os.getenv("DATAAGENT_MILVUS_TOKEN", ""))
+    parser.add_argument("--allowed-tables", default=os.getenv("DATAAGENT_ALLOWED_TABLES", ""))
+    parser.add_argument(
+        "--initialize-demo",
+        action=argparse.BooleanOptionalAction,
+        default=os.getenv("DATAAGENT_INITIALIZE_DEMO", "false").lower() in {"1", "true", "yes"},
+    )
     parser.add_argument(
         "--allow-mock",
         action="store_true",
@@ -83,11 +99,29 @@ def main() -> None:
         os.getenv("DATAAGENT_MAX_REQUEST_BYTES", str(64 * 1024))
     )
     DataAgentHandler.pipeline = DataAgentText2SQLPipeline(
-        PipelineConfig(db_path=Path(args.db), allow_mock=args.allow_mock)
+        PipelineConfig(
+            database_name=args.database_name,
+            db_path=Path(args.db),
+            initialize_demo=args.initialize_demo,
+            business_meta_path=Path(args.business_meta) if args.business_meta else None,
+            allowed_tables=tuple(
+                table.strip() for table in args.allowed_tables.split(",") if table.strip()
+            ),
+            milvus_uri=args.milvus_uri or None,
+            milvus_token=args.milvus_token,
+            allow_mock=args.allow_mock,
+        )
     )
     server = ThreadingHTTPServer((args.host, args.port), DataAgentHandler)
+    signal.signal(signal.SIGTERM, _terminate)
     print(f"DataAgent API listening on http://{args.host}:{args.port}")
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+        DataAgentHandler.pipeline.close()
 
 
 if __name__ == "__main__":

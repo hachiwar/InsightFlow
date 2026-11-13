@@ -223,6 +223,8 @@ public class MindAgentProperties {
     public static class Security {
         private boolean enabled = false;
         private String apiKey = "";
+        private String adminApiKey = "";
+        private String principalId = "api-client";
 
         public boolean isEnabled() {
             return enabled;
@@ -238,6 +240,22 @@ public class MindAgentProperties {
 
         public void setApiKey(String apiKey) {
             this.apiKey = apiKey;
+        }
+
+        public String getAdminApiKey() {
+            return adminApiKey;
+        }
+
+        public void setAdminApiKey(String adminApiKey) {
+            this.adminApiKey = adminApiKey;
+        }
+
+        public String getPrincipalId() {
+            return principalId;
+        }
+
+        public void setPrincipalId(String principalId) {
+            this.principalId = principalId;
         }
     }
 }
